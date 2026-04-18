@@ -1,41 +1,40 @@
-/* Oculo — color token system v4
-   Themes: data-theme="light" | "dark" on <html>
-   Nguyên tắc: mỗi theme tự đủ, không patch chồng chất */
+/* Oculo — color token system v5  (Arctic Blue)
+   Themes: data-theme="light" | "dark" on <html> */
 
 /* ════════════════════════════════════════════
    TIER 1 — Primitive palette (shared)
    ════════════════════════════════════════════ */
 :root {
-  /* Neutral scale — warm-tinted */
+  /* Neutral scale — cool slate tint */
   --gray-0:   #ffffff;
-  --gray-50:  #fafaf9;
-  --gray-100: #f4f4f2;
-  --gray-150: #eeeeec;
-  --gray-200: #e2e2e0;
-  --gray-300: #cbcbc9;
-  --gray-400: #9e9e9c;
-  --gray-500: #6e6e6c;
-  --gray-600: #4e4e4c;
-  --gray-700: #3a3a38;
-  --gray-750: #303030;
-  --gray-800: #262624;
-  --gray-850: #1e1e1c;
-  --gray-900: #161614;
-  --gray-950: #0e0e0c;
+  --gray-50:  #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-150: #e8edf5;
+  --gray-200: #dde3ee;
+  --gray-300: #c4cfe0;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-750: #2b3a50;
+  --gray-800: #1e293b;
+  --gray-850: #172033;
+  --gray-900: #0f172a;
+  --gray-950: #080e1a;
 
-  /* Accent — indigo/violet 265° */
-  --accent-50:  #f2f0ff;
-  --accent-100: #e4e0ff;
-  --accent-200: #c8c2ff;
-  --accent-300: #a89ff8;
-  --accent-400: #8880f2;
-  --accent-500: #6c63f0;
-  --accent-600: #5750d8;
-  --accent-700: #433dc0;
-  --accent-800: #2e2a8a;
+  /* Accent — Arctic Blue 220° */
+  --accent-50:  #eff6ff;
+  --accent-100: #dbeafe;
+  --accent-200: #bfdbfe;
+  --accent-300: #93c5fd;
+  --accent-400: #60a5fa;
+  --accent-500: #3b82f6;
+  --accent-600: #2563eb;
+  --accent-700: #1d4ed8;
+  --accent-800: #1e40af;
 
   /* Status primitives */
-  --green-50: #f0fdf5; --green-400: #4ade80; --green-500: #22c55e;
+  --green-50: #f0fdf4; --green-400: #4ade80; --green-500: #22c55e;
   --green-600: #16a34a; --green-800: #166534;
   --amber-50: #fffbeb; --amber-400: #fbbf24; --amber-500: #f59e0b;
   --amber-600: #d97706; --amber-800: #92400e;
@@ -70,7 +69,7 @@
   --shadow-lg:    0 8px 28px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.07);
   --shadow-xl:    0 16px 48px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.09);
   --shadow-inset: inset 0 1px 2px rgba(0,0,0,0.07);
-  --focus-ring:   0 0 0 2px #6c63f0, 0 0 0 4px rgba(108,99,240,0.18);
+  --focus-ring:   0 0 0 2px #2563eb, 0 0 0 4px rgba(37,99,235,0.18);
 
   /* Layout */
   --header-h: 53px; --status-bar-h: 28px;
@@ -85,49 +84,48 @@
   --z-drop-overlay: 90; --z-modal: 100; --z-modal-confirm: 110;
   --z-lightbox: 200; --z-toast: 999; --z-offline: 9999; --z-skip-focus: 10200;
 
-  --accent-border-soft: rgba(108,99,240,0.22);
+  --accent-border-soft: rgba(37,99,235,0.22);
   --overlay-strong: rgba(0,0,0,0.72);
   --overlay-light:  rgba(0,0,0,0.40);
-  --mesh-a: #6c63f0; --mesh-b: #a78bfa; --mesh-c: #818cf8;
+  --mesh-a: #2563eb; --mesh-b: #60a5fa; --mesh-c: #3b82f6;
 }
 
 /* ════════════════════════════════════════════
-   LIGHT MODE — Clean & readable
+   LIGHT MODE
    ════════════════════════════════════════════ */
 :root[data-theme="light"] {
   /* ── Backgrounds ── */
-  --bg-page:     #f2f1ee;   /* warm paper */
-  --bg-surface:  #ffffff;   /* cards, bubbles */
-  --bg-elevated: #ffffff;   /* modals */
-  --bg-subtle:   #f6f5f2;   /* code, secondary panels */
-  --bg-muted:    #ebebea;   /* tags, inputs */
+  --bg-page:     #f0f4fa;
+  --bg-surface:  #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle:   #f5f8fd;
+  --bg-muted:    #e8edf5;
 
-  /* For glassmorphism: rgba(var(--bg-surface-rgb), opacity) */
   --bg-surface-rgb: 255, 255, 255;
 
   /* ── Borders ── */
-  --border-subtle:  rgba(0,0,0,0.07);
-  --border-default: rgba(0,0,0,0.12);
-  --border-strong:  rgba(0,0,0,0.20);
+  --border-subtle:  rgba(0,0,0,0.06);
+  --border-default: rgba(0,0,0,0.10);
+  --border-strong:  rgba(0,0,0,0.18);
 
   /* ── Text ── */
-  --text-primary:   #1c1b19;
-  --text-secondary: #5c5c59;
-  --text-tertiary:  #8c8c89;
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary:  #94a3b8;
   --text-inverse:   #ffffff;
 
   /* ── Interactive ── */
-  --interactive-default: #6c63f0;
-  --interactive-hover:   #5750d8;
-  --interactive-subtle:  rgba(108,99,240,0.08);
+  --interactive-default: #2563eb;
+  --interactive-hover:   #1d4ed8;
+  --interactive-subtle:  rgba(37,99,235,0.08);
 
   /* ── Status ── */
-  --status-success-bg: #f0fdf5; --status-success-text: #15803d; --status-success-border: rgba(22,163,74,0.30);
+  --status-success-bg: #f0fdf4; --status-success-text: #15803d; --status-success-border: rgba(22,163,74,0.30);
   --status-warning-bg: #fffbeb; --status-warning-text: #92400e; --status-warning-border: rgba(217,119,6,0.35);
   --status-error-bg:   #fff1f2; --status-error-text:   #991b1b; --status-error-border:   rgba(220,38,38,0.30);
   --status-info-bg:    #eff6ff; --status-info-text:    #1e40af; --status-info-border:    rgba(37,99,235,0.30);
 
-  /* ── Aliases (legacy) ── */
+  /* ── Aliases ── */
   --bg: var(--bg-page);
   --surface: var(--bg-surface);
   --surface-solid: var(--bg-elevated);
@@ -141,67 +139,65 @@
   --user-bg: var(--interactive-default);
 
   /* ── Chat bubbles ── */
-  --chat-user-1: #6c63f0;
-  --chat-user-2: #5750d8;
+  --chat-user-1: #2563eb;
+  --chat-user-2: #1d4ed8;
   --chat-user-text: #ffffff;
-  --chat-user-border: rgba(108,99,240,0.18);
-  --chat-user-shadow: 0 2px 8px rgba(108,99,240,0.20);
+  --chat-user-border: rgba(37,99,235,0.18);
+  --chat-user-shadow: 0 2px 8px rgba(37,99,235,0.20);
   --chat-user-inset: inset 0 1px 0 rgba(255,255,255,0.20);
   --chat-user-code-bg: rgba(0,0,0,0.14);
-  --chat-user-code-fg: #ede9fe;
+  --chat-user-code-fg: #bfdbfe;
   --chat-agent-bg: #ffffff;
-  --chat-agent-border: rgba(0,0,0,0.08);
-  --chat-agent-sh: 0 1px 4px rgba(0,0,0,0.07);
+  --chat-agent-border: rgba(0,0,0,0.07);
+  --chat-agent-sh: 0 1px 4px rgba(0,0,0,0.06);
 
   /* ── Misc ── */
-  --code-bg: #f5f5f2;
-  --tool-bg: rgba(108,99,240,0.05);
+  --code-bg: #f1f5fb;
+  --tool-bg: rgba(37,99,235,0.05);
   --shadow:    var(--shadow-md);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.11), 0 2px 8px rgba(0,0,0,0.05);
   --green: #16a34a; --red: #dc2626; --yellow: #f59e0b; --amber: #f59e0b;
-  --overlay: rgba(0,0,0,0.32);
+  --overlay: rgba(0,0,0,0.30);
 
-  /* ── Glow (disabled in light) ── */
   --glow1: none; --glow2: none; --glow3: none;
 }
 
 /* ════════════════════════════════════════════
-   DARK MODE — Warm charcoal, rich contrast
+   DARK MODE — Deep Navy
    ════════════════════════════════════════════ */
 :root[data-theme="dark"] {
-  /* ── Backgrounds — 4 tầng rõ ràng ── */
-  --bg-page:     #121211;   /* nền trang — tối nhất */
-  --bg-surface:  #1e1e1d;   /* card, bubble — tầng 2 */
-  --bg-elevated: #272726;   /* modal, dropdown — tầng 3 */
-  --bg-subtle:   #1a1a19;   /* code block — giữa page và surface */
-  --bg-muted:    #232322;   /* input, tag */
+  /* ── Backgrounds — navy tinted ── */
+  --bg-page:     #090d14;
+  --bg-surface:  #111827;
+  --bg-elevated: #1c2333;
+  --bg-subtle:   #0f1621;
+  --bg-muted:    #16202e;
 
-  /* For glassmorphism */
-  --bg-surface-rgb: 30, 30, 29;
+  --bg-surface-rgb: 17, 24, 39;
 
   /* ── Borders ── */
-  --border-subtle:  rgba(255,255,255,0.06);
-  --border-default: rgba(255,255,255,0.10);
-  --border-strong:  rgba(255,255,255,0.16);
+  --border-subtle:  rgba(255,255,255,0.05);
+  --border-default: rgba(255,255,255,0.09);
+  --border-strong:  rgba(255,255,255,0.15);
 
   /* ── Text ── */
-  --text-primary:   #eeebe7;   /* warm white */
-  --text-secondary: #a0a09e;
-  --text-tertiary:  #686866;
-  --text-inverse:   #121211;
+  --text-primary:   #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary:  #475569;
+  --text-inverse:   #090d14;
 
-  /* ── Interactive — đủ sáng trên nền tối ── */
-  --interactive-default: #8078f4;
-  --interactive-hover:   #a89ff8;
-  --interactive-subtle:  rgba(128,120,244,0.14);
+  /* ── Interactive ── */
+  --interactive-default: #60a5fa;
+  --interactive-hover:   #93c5fd;
+  --interactive-subtle:  rgba(96,165,250,0.14);
 
   /* ── Status ── */
   --status-success-bg: rgba(34,197,94,0.10); --status-success-text: #86efac; --status-success-border: rgba(34,197,94,0.22);
   --status-warning-bg: rgba(245,158,11,0.10); --status-warning-text: #fcd34d; --status-warning-border: rgba(245,158,11,0.22);
   --status-error-bg:   rgba(239,68,68,0.10);  --status-error-text:   #fca5a5; --status-error-border:   rgba(239,68,68,0.22);
-  --status-info-bg:    rgba(59,130,246,0.10);  --status-info-text:    #93c5fd; --status-info-border:    rgba(59,130,246,0.22);
+  --status-info-bg:    rgba(96,165,250,0.10);  --status-info-text:    #93c5fd; --status-info-border:    rgba(96,165,250,0.22);
 
-  /* ── Aliases (legacy) ── */
+  /* ── Aliases ── */
   --bg: var(--bg-page);
   --surface: var(--bg-surface);
   --surface-solid: var(--bg-elevated);
@@ -215,28 +211,28 @@
   --user-bg: var(--interactive-default);
 
   /* ── Chat bubbles ── */
-  --chat-user-1: #6c63f0;
-  --chat-user-2: #5550cc;
-  --chat-user-text: #f0eeeb;
-  --chat-user-border: rgba(128,120,244,0.28);
-  --chat-user-shadow: 0 2px 14px rgba(108,99,240,0.25), 0 1px 3px rgba(0,0,0,0.35);
-  --chat-user-inset: inset 0 1px 0 rgba(255,255,255,0.12);
+  --chat-user-1: #2563eb;
+  --chat-user-2: #1d4ed8;
+  --chat-user-text: #e2e8f0;
+  --chat-user-border: rgba(96,165,250,0.28);
+  --chat-user-shadow: 0 2px 14px rgba(37,99,235,0.25), 0 1px 3px rgba(0,0,0,0.40);
+  --chat-user-inset: inset 0 1px 0 rgba(255,255,255,0.10);
   --chat-user-code-bg: rgba(0,0,0,0.30);
-  --chat-user-code-fg: #c4bffd;
-  --chat-agent-bg: #1e1e1d;
-  --chat-agent-border: rgba(255,255,255,0.08);
+  --chat-user-code-fg: #bfdbfe;
+  --chat-agent-bg: #111827;
+  --chat-agent-border: rgba(255,255,255,0.07);
   --chat-agent-sh: 0 1px 6px rgba(0,0,0,0.30);
 
   /* ── Misc ── */
-  --code-bg: #151514;
-  --tool-bg: rgba(128,120,244,0.08);
-  --shadow:    0 4px 16px rgba(0,0,0,0.32), 0 1px 4px rgba(0,0,0,0.20);
-  --shadow-lg: 0 8px 36px rgba(0,0,0,0.44), 0 2px 10px rgba(0,0,0,0.24), 0 1px 0 rgba(255,255,255,0.04);
+  --code-bg: #0d1420;
+  --tool-bg: rgba(96,165,250,0.07);
+  --shadow:    0 4px 16px rgba(0,0,0,0.36), 0 1px 4px rgba(0,0,0,0.22);
+  --shadow-lg: 0 8px 36px rgba(0,0,0,0.48), 0 2px 10px rgba(0,0,0,0.26), 0 1px 0 rgba(255,255,255,0.03);
   --green: #4ade80; --red: #f87171; --yellow: #fbbf24; --amber: #fbbf24;
-  --overlay: rgba(0,0,0,0.68);
+  --overlay: rgba(0,0,0,0.72);
 
-  /* ── Ambient glow ── */
-  --glow1: radial-gradient(ellipse 50% 40% at 12% 6%, rgba(108,99,240,0.10) 0%, transparent 70%);
-  --glow2: radial-gradient(ellipse 40% 35% at 88% 94%, rgba(167,139,250,0.08) 0%, transparent 70%);
+  /* ── Ambient glow — blue ── */
+  --glow1: radial-gradient(ellipse 50% 40% at 12% 6%, rgba(37,99,235,0.10) 0%, transparent 70%);
+  --glow2: radial-gradient(ellipse 40% 35% at 88% 94%, rgba(96,165,250,0.07) 0%, transparent 70%);
   --glow3: none;
 }

@@ -339,8 +339,9 @@
     <div id="skill-active-badge" class="skill-active-badge is-hidden" data-oculo="openSkills"></div>
 
     <!-- Automation panel toggle button -->
-    <button type="button" class="hbtn auto-panel-btn" id="auto-panel-btn" data-oculo="toggleAutoPanel" title="Tự động hóa" aria-label="Mở bảng tự động hóa" aria-expanded="false" aria-controls="auto-panel">
+    <button type="button" class="hbtn auto-panel-btn" id="auto-panel-btn" data-oculo="toggleAutoPanel" title="Tự động hóa — kỹ năng, pipeline, giám sát, lịch" aria-label="Mở bảng tự động hóa" aria-expanded="false" aria-controls="auto-panel">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <span class="auto-panel-btn-label">Tự động</span>
     </button>
 
     <!-- Overflow "..." menu — chỉ giữ 5 items thường dùng -->
@@ -503,11 +504,10 @@
 </div>
 
 <!-- Context window meter -->
-<div id="ctx-meter">
+<div id="ctx-meter" title="Context window đã dùng — khi gần 100%, lịch sử hội thoại sẽ được nén tự động để tiết kiệm tokens">
   <div class="ctx-bar"><div class="ctx-fill" id="ctx-fill"></div></div>
   <div class="ctx-info">
     <span class="ctx-pct" id="ctx-pct">0%</span>
-    <span>context</span>
     <span id="ctx-tokens" class="ctx-tokens-muted"></span>
   </div>
 </div>
