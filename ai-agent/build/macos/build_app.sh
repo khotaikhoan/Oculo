@@ -40,10 +40,17 @@ echo "Building $APP_NAME.app (bundle id: $BUNDLE_ID)..."
   --osx-bundle-identifier "$BUNDLE_ID" \
   --add-data "static:static" \
   --add-data "Oculo.icns:." \
-  "${ADD_DATA_ENV[@]}" \
+  "${ADD_DATA_ENV[@]+"${ADD_DATA_ENV[@]}"}" \
   --collect-submodules chromadb \
   --collect-submodules sentence_transformers \
   --collect-submodules webview \
+  --exclude-module torch.cuda \
+  --exclude-module torch.distributed \
+  --exclude-module torch.testing \
+  --hidden-import chromadb.api.segment \
+  --hidden-import chromadb.db.impl.sqlite \
+  --hidden-import chromadb.segment.impl.vector.local_hnsw \
+  --log-level WARN \
   oculo_app.py
 
 APP_PATH="$ROOT_DIR/dist/$APP_NAME.app"
