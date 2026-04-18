@@ -1,0 +1,51 @@
+name: Build & attach DMG to release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to attach DMG to (e.g. v0.2.0)"
+        required: true
+        default: "v0.2.0"
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag_name }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create venv & install deps
+        working-directory: ai-agent
+        run: |
+          python3 -m venv venv
+          ./venv/bin/pip install -q --upgrade pip
+          ./venv/bin/pip install -q -r requirements.txt
+          ./venv/bin/pip install -q pyinstaller
+
+      - name: Build Oculo.app
+        working-directory: ai-agent
+        run: bash build/macos/build_app.sh
+
+      - name: Create DMG
+        working-directory: ai-agent
+        run: bash build/macos/make_dmg.sh
+
+      - name: Upload DMG to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag_name }}"
+          gh release upload "$TAG" ai-agent/dist/Oculo.dmg --clobber
