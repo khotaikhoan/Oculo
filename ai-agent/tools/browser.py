@@ -57,11 +57,32 @@ DEFAULT_USER_AGENT = (
     "Chrome/122.0.0.0 Safari/537.36"
 )
 
+# Per-session screen/DPI profiles — picked once at startup, consistent for the session
+SCREEN_PROFILES = [
+    {"width": 1920, "height": 1080, "dpr": 1},
+    {"width": 2560, "height": 1440, "dpr": 2},
+    {"width": 1440, "height": 900,  "dpr": 2},
+    {"width": 1512, "height": 982,  "dpr": 2},
+    {"width": 1280, "height": 800,  "dpr": 1},
+]
+
+_session_fingerprint: dict = {}
+
+
+def _get_session_fingerprint() -> dict:
+    global _session_fingerprint
+    if not _session_fingerprint:
+        _session_fingerprint = random.choice(SCREEN_PROFILES).copy()
+    return _session_fingerprint
+
 
 def _viewport() -> dict:
-    w = int(os.getenv("BROWSER_VIEWPORT_W", "1440"))
-    h = int(os.getenv("BROWSER_VIEWPORT_H", "900"))
-    return {"width": w, "height": h}
+    w = os.getenv("BROWSER_VIEWPORT_W", "")
+    h = os.getenv("BROWSER_VIEWPORT_H", "")
+    if w and h:
+        return {"width": int(w), "height": int(h)}
+    fp = _get_session_fingerprint()
+    return {"width": fp["width"], "height": fp["height"]}
 
 
 def _headless() -> bool:
@@ -415,6 +436,20 @@ def _apply_anti_detection_init(context) -> None:
         return
     try:
         context.add_init_script(ANTI_DETECTION_INIT)
+        # Override screen dimensions with per-session randomized fingerprint
+        fp = _get_session_fingerprint()
+        screen_override = f"""
+(() => {{
+  try {{
+    Object.defineProperty(screen, 'width',       {{ get: () => {fp['width']},  configurable: true }});
+    Object.defineProperty(screen, 'height',      {{ get: () => {fp['height']}, configurable: true }});
+    Object.defineProperty(screen, 'availWidth',  {{ get: () => {fp['width']},  configurable: true }});
+    Object.defineProperty(screen, 'availHeight', {{ get: () => {fp['height'] - 40}, configurable: true }});
+    Object.defineProperty(window, 'devicePixelRatio', {{ get: () => {fp['dpr']}, configurable: true }});
+  }} catch (e) {{}}
+}})();
+"""
+        context.add_init_script(screen_override)
         _init_scripts_applied_to = cid
     except Exception:
         pass
@@ -1693,9 +1728,10 @@ def browser_macro_stop(name: str) -> str:
     return f"Đã lưu macro '{key}' ({len(_macro_library[key])} bước): {_json.dumps(_macro_library[key], ensure_ascii=False)[:300]}"
 
 
-def browser_macro_replay(name: str) -> str:
+def browser_macro_replay(name: str, timing_variance: float = 0.2) -> str:
     """
     Replay macro đã ghi theo tên. Thực thi các bước đã record.
+    timing_variance: 0.0-0.5 — độ biến đổi ngẫu nhiên ±% cho mọi delay (tránh pattern nhận dạng).
     Tiết kiệm toàn bộ LLM round-trips cho task lặp lại.
     """
     key = name.strip().lower().replace(" ", "_")
@@ -1703,7 +1739,25 @@ def browser_macro_replay(name: str) -> str:
     if not steps:
         available = list(_macro_library.keys())
         return f"Error: Không tìm thấy macro '{key}'. Có sẵn: {available}"
-    return browser_run_sequence(steps)
+    # Apply timing variance: jitter explicit wait steps so each replay looks different
+    tv = max(0.0, min(0.5, timing_variance))
+    varied_steps = []
+    for step in steps:
+        s = dict(step)
+        if s.get("action") == "wait" and "ms" in s:
+            ms = int(s["ms"])
+            jitter = ms * random.uniform(-tv, tv)
+            s["ms"] = max(50, int(ms + jitter))
+        varied_steps.append(s)
+    # Also add small random inter-step pauses to vary overall rhythm
+    sequenced = []
+    for s in varied_steps:
+        sequenced.append(s)
+        if tv > 0 and s.get("action") not in ("wait",):
+            jitter_ms = int(random.uniform(80, 250) * tv)
+            if jitter_ms > 30:
+                sequenced.append({"action": "wait", "ms": jitter_ms})
+    return browser_run_sequence(sequenced)
 
 
 def browser_macro_list() -> str:
@@ -1841,6 +1895,79 @@ def browser_preflight_check(url: str) -> str:
         return _json.dumps(output, ensure_ascii=False, indent=2)
     except Exception as e:
         return _json.dumps({"url": url, "status": "check_failed", "error": str(e), "safe_to_navigate": True}, ensure_ascii=False)
+
+
+def browser_set_network_throttle(profile: str = "wifi") -> str:
+    """
+    Mô phỏng điều kiện mạng thực tế qua CDP Network.emulateNetworkConditions.
+    profile: "wifi" | "4g" | "3g" | "slow_3g" | "offline" | "off"
+    Giúp timing thao tác phù hợp với trải nghiệm người dùng thực.
+    """
+    try:
+        page = _get_page()
+    except BrowserCDPError as e:
+        return f"Error: {e}"
+    profiles = {
+        "wifi":     {"downloadThroughput": 10_000_000 / 8, "uploadThroughput": 5_000_000 / 8, "latency": 20},
+        "4g":       {"downloadThroughput": 4_000_000 / 8,  "uploadThroughput": 3_000_000 / 8,  "latency": 50},
+        "3g":       {"downloadThroughput": 1_500_000 / 8,  "uploadThroughput": 750_000 / 8,    "latency": 100},
+        "slow_3g":  {"downloadThroughput": 400_000 / 8,    "uploadThroughput": 300_000 / 8,    "latency": 400},
+        "offline":  {"downloadThroughput": 0, "uploadThroughput": 0, "latency": 0},
+    }
+    if profile == "off":
+        try:
+            cdp = page.context.new_cdp_session(page)
+            cdp.send("Network.emulateNetworkConditions", {
+                "offline": False, "downloadThroughput": -1, "uploadThroughput": -1, "latency": 0
+            })
+            return "Network throttle: tắt (mạng thật)"
+        except Exception as e:
+            return f"Error removing throttle: {e}"
+    cfg = profiles.get(profile.lower())
+    if not cfg:
+        return f"Error: profile không hợp lệ. Chọn: {list(profiles.keys()) + ['off']}"
+    try:
+        cdp = page.context.new_cdp_session(page)
+        cdp.send("Network.emulateNetworkConditions", {
+            "offline": profile == "offline",
+            **cfg,
+            "connectionType": "wifi" if profile == "wifi" else "cellular4g" if profile == "4g" else "cellular3g",
+        })
+        return f"Network throttle: {profile} ({cfg['latency']}ms latency, ↓{cfg['downloadThroughput']*8/1_000_000:.1f}Mbps)"
+    except Exception as e:
+        return f"Error setting throttle: {e}"
+
+
+def browser_wait_for_stable(selector: str, timeout_ms: int = 5000) -> str:
+    """
+    Đợi element xuất hiện, visible, và trang không còn spinner/loading state.
+    Thông minh hơn page.wait_for_selector — kiểm tra cả DOM stability.
+    """
+    try:
+        page = _get_page()
+    except BrowserCDPError as e:
+        return f"Error: {e}"
+    try:
+        loc = page.locator(selector)
+        loc.wait_for(state="visible", timeout=timeout_ms)
+        # Wait for spinners/loaders to disappear
+        for spinner_sel in [".loading", ".spinner", "[aria-busy='true']", "#loading", "[data-loading]"]:
+            try:
+                page.wait_for_selector(spinner_sel, state="hidden", timeout=min(1500, timeout_ms // 3))
+            except Exception:
+                pass
+        # Wait for DOM to stop mutating (SPA hydration settle)
+        _wait_for_dom_stable(page, min(800, timeout_ms // 4))
+        box = None
+        try:
+            box = loc.first.bounding_box()
+        except Exception:
+            pass
+        if box:
+            return f"Element stable: selector={selector!r} at ({int(box['x'])},{int(box['y'])})"
+        return f"Element visible: selector={selector!r}"
+    except Exception as e:
+        return f"Error browser_wait_for_stable: {e}"
 
 
 def close_browser():

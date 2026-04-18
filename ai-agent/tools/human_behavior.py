@@ -144,12 +144,19 @@ class HumanMouse:
 
     @classmethod
     def click(cls, page, x: int, y: int, button: str = "left") -> None:
-        cls.move_to(page, x, y)
         if _FAST_MODE:
+            cls.move_to(page, x, y)
             page.mouse.down(button=button)
             time.sleep(random.uniform(0.03, 0.07))
             page.mouse.up(button=button)
             return
+        # Overshoot: land slightly past target, micro-correct back (human motor pattern)
+        overshoot_x = x + int(random.gauss(0, 5))
+        overshoot_y = y + int(random.gauss(0, 5))
+        cls.move_to(page, overshoot_x, overshoot_y)
+        if abs(overshoot_x - x) > 2 or abs(overshoot_y - y) > 2:
+            time.sleep(random.uniform(0.04, 0.09))
+            cls.move_to(page, x, y)
         time.sleep(random.uniform(0.05, 0.15))
         page.mouse.down(button=button)
         time.sleep(random.uniform(0.08, 0.25))
@@ -160,15 +167,22 @@ class HumanMouse:
         if _FAST_MODE:
             return
         end = time.monotonic() + duration_sec
-        x = random.randint(300, 1100)
-        y = random.randint(200, 700)
+        x = random.randint(400, 1000)
+        y = random.randint(200, 600)
+        # Slow drift direction — simulates reading/idle cursor behavior
+        drift_vx = random.uniform(-1.5, 1.5)
+        drift_vy = random.uniform(-0.8, 0.8)
         while time.monotonic() < end:
-            x += random.randint(-20, 20)
-            y += random.randint(-10, 10)
-            x = max(100, min(1340, x))
-            y = max(100, min(800, y))
+            x = int(x + drift_vx + random.uniform(-4, 4))
+            y = int(y + drift_vy + random.uniform(-3, 3))
+            if x < 150 or x > 1300:
+                drift_vx = -drift_vx
+            if y < 120 or y > 780:
+                drift_vy = -drift_vy
+            x = max(150, min(1300, x))
+            y = max(120, min(780, y))
             page.mouse.move(x, y)
-            time.sleep(random.uniform(0.05, 0.15))
+            time.sleep(random.uniform(0.08, 0.2))
 
 
 class HumanKeyboard:
@@ -197,6 +211,9 @@ class HumanKeyboard:
                     pass
             time.sleep(random.uniform(0.05, 0.15))
             page.keyboard.press("Backspace")
+        # Burst-pause pattern: type 3-7 words in a burst, then pause to "think"
+        word_count = 0
+        burst_limit = random.randint(3, 7)
         for char in text:
             if random.random() < 0.02 and char.isalpha():
                 wrong = random.choice("qwertyuiopasdfghjklzxcvbnm")
@@ -206,6 +223,12 @@ class HumanKeyboard:
                 time.sleep(random.uniform(0.05, 0.15))
             page.keyboard.type(char, delay=0)
             time.sleep(HumanTiming.typing_delay(char))
+            if char == " ":
+                word_count += 1
+                if word_count >= burst_limit:
+                    time.sleep(random.uniform(0.18, 0.55))
+                    word_count = 0
+                    burst_limit = random.randint(3, 7)
         time.sleep(random.uniform(0.2, 0.5))
 
     @staticmethod
@@ -218,11 +241,14 @@ class HumanKeyboard:
         if distance is None:
             distance = random.randint(200, 600)
         if steps is None:
-            steps = random.randint(3, 8)
-        delta_per_step = max(1, distance // max(1, steps))
-        for _ in range(steps):
-            actual_delta = delta_per_step + random.randint(-20, 20)
-            if direction == "up":
-                actual_delta = -actual_delta
-            page.mouse.wheel(0, actual_delta)
-            time.sleep(random.uniform(0.08, 0.25))
+            steps = random.randint(4, 10)
+        sign = -1 if direction == "up" else 1
+        for i in range(steps):
+            # Ease-out momentum: heavier chunks at start, lighter at end (deceleration feel)
+            factor = (steps - i) / steps
+            chunk = int((distance / steps) * factor * 1.8) + random.randint(-15, 15)
+            chunk = max(8, chunk)
+            page.mouse.wheel(0, sign * chunk)
+            # Gap grows toward end: start fast, coast to stop
+            delay = random.uniform(0.04, 0.09) + (i / steps) * 0.13
+            time.sleep(delay)
