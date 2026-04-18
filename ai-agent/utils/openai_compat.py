@@ -80,8 +80,14 @@ def is_openai_compat_model(model_id: str) -> bool:
     if not mid or not openai_compat_configured():
         return False
     # Nhiều proxy (vd. chiasegpu) liệt kê cùng id Claude trong GET /v1/models lẫn Anthropic.
-    # Nếu có ANTHROPIC_API_KEY thì ưu tiên Messages API cho claude-* — tránh gọi nhầm /v1 → Gemini.
-    if (os.getenv("ANTHROPIC_API_KEY") or "").strip() and _is_claude_messages_style_id(mid):
-        return False
+    # Nếu đã cấu hình key cho Anthropic SDK (Messages / proxy) thì ưu tiên Messages cho claude-*.
+    try:
+        from utils.api_key_manager import key_manager
+
+        key_manager.reload()
+        if key_manager.keys and _is_claude_messages_style_id(mid):
+            return False
+    except Exception:
+        pass
     ids = list_openai_compat_model_ids()
     return mid in set(ids)
