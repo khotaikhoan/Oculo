@@ -1,0 +1,13 @@
+{
+  "name": "oculo-web",
+  "private": true,
+  "type": "module",
+  "description": "npm run build tạo static/dist/oculo-app.iife.js — không dùng trong index (IIFE không expose window → onclick hỏng). Giữ để minify/tùy chọn sau.",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}

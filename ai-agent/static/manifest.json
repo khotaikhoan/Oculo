@@ -1,0 +1,33 @@
+{
+  "name": "Oculo",
+  "short_name": "Oculo",
+  "description": "Oculo — Trợ lý AI nhìn thấu mọi việc. Điều khiển macOS, duyệt web, tự động hóa với Claude AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070b14",
+  "theme_color": "#7c9fff",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23070b14'/><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%237c9fff'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><rect x='32' y='32' width='128' height='128' rx='28' fill='url(%23g)' opacity='.15'/><circle cx='96' cy='88' r='24' fill='none' stroke='url(%23g)' stroke-width='8'/><path d='M96 64 L96 88 L112 100' stroke='url(%23g)' stroke-width='7' stroke-linecap='round'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23070b14'/><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%237c9fff'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><rect x='80' y='80' width='352' height='352' rx='72' fill='url(%23g)' opacity='.12'/><circle cx='256' cy='230' r='65' fill='none' stroke='url(%23g)' stroke-width='22'/><path d='M256 165 L256 230 L300 262' stroke='url(%23g)' stroke-width='20' stroke-linecap='round'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat mới",
+      "short_name": "Mới",
+      "url": "/?new=1",
+      "description": "Bắt đầu cuộc trò chuyện mới với Oculo"
+    }
+  ]
+}

@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Oculo — Theme Mockups (10 palettes)</title>
+  <style>
+    :root{
+      --page:#0b0f19;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.08);
+      --text:#eaf0ff;
+      --muted:rgba(234,240,255,.72);
+      --stroke:rgba(255,255,255,.10);
+      --stroke2:rgba(255,255,255,.18);
+      --shadow: 0 16px 60px rgba(0,0,0,.32);
+      --radius:18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:
+        radial-gradient(1000px 500px at 10% 0%, rgba(124,159,255,.18), transparent 60%),
+        radial-gradient(900px 520px at 95% 105%, rgba(167,139,250,.14), transparent 62%),
+        var(--page);
+      color:var(--text);
+    }
+    a{color:inherit}
+    .wrap{
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 22px 18px 40px;
+    }
+    .top{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+      margin-bottom: 14px;
+    }
+    .hgroup{min-width:0}
+    h1{
+      font-size: 18px;
+      margin:0 0 6px;
+      letter-spacing:.2px;
+      font-weight: 680;
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .tip{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .controls{
+      display:flex;align-items:center;gap:10px;
+      flex-shrink:0;
+    }
+    .btn{
+      appearance:none;border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      padding: 9px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      cursor:pointer;
+      transition: transform .12s ease, border-color .2s ease, background .2s ease;
+      user-select:none;
+    }
+    .btn:hover{border-color:var(--stroke2);background:rgba(255,255,255,.07)}
+    .btn:active{transform: translateY(1px)}
+    .toast{
+      position: fixed;
+      inset: auto 18px 18px auto;
+      padding: 10px 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(10,12,18,.72);
+      backdrop-filter: blur(12px) saturate(140%);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .18s ease, transform .18s ease;
+      pointer-events:none;
+      z-index: 50;
+    }
+    .toast.show{opacity:1;transform: translateY(0)}
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width: 920px){
+      .grid{grid-template-columns: 1fr}
+      .controls{flex-wrap:wrap;justify-content:flex-end}
+    }
+
+    /* ──────────────────────────────────────────────
+       Theme card
+       Each .theme card defines CSS vars similar to Oculo tokens.
+       ────────────────────────────────────────────── */
+    .theme{
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius);
+      overflow:hidden;
+      background: rgba(255,255,255,.03);
+      box-shadow: 0 10px 38px rgba(0,0,0,.22);
+    }
+    .theme__head{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      background: rgba(255,255,255,.02);
+    }
+    .theme__name{
+      min-width:0;
+      display:flex;align-items:center;gap:10px;
+      font-weight: 650;
+      letter-spacing:.2px;
+      font-size: 13px;
+    }
+    .swatch{
+      width: 10px;height:10px;border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 0 3px rgba(255,255,255,.05);
+    }
+    .theme__meta{
+      color: var(--soft);
+      font-size: 11px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 54%;
+    }
+    .theme__actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+    .miniBtn{
+      padding: 7px 9px;
+      border-radius: 10px;
+      font-size: 11px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.88);
+      cursor:pointer;
+    }
+    .miniBtn:hover{border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.06)}
+
+    /* Mini app mock (visual-only, not functional) */
+    .mock{
+      position:relative;
+      height: 360px;
+      background: var(--bg-page);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+    .mock::before,
+    .mock::after{
+      content:"";
+      position:absolute;
+      width: 140%;
+      height: 140%;
+      top:-20%;
+      left:-20%;
+      background: radial-gradient(circle at 45% 35%, var(--mesh-a) 0%, transparent 55%);
+      opacity: .16;
+      pointer-events:none;
+      mix-blend-mode: screen;
+      filter: blur(0px);
+    }
+    .mock::after{
+      top:auto;left:auto;right:-25%;bottom:-25%;
+      background: radial-gradient(circle at 55% 55%, var(--mesh-b) 0%, transparent 52%);
+      opacity: .14;
+    }
+    .mock__glass{
+      position:absolute;inset: 10px;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(var(--bg-surface-rgb), .08);
+      overflow:hidden;
+      box-shadow: 0 14px 42px rgba(0,0,0,.28);
+    }
+    .mock__header{
+      height: 46px;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding: 0 12px;
+      background: rgba(var(--bg-surface-rgb), .72);
+      backdrop-filter: blur(18px) saturate(160%);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .brand{
+      display:flex;align-items:center;gap:10px;min-width:0;
+    }
+    .orb{
+      width: 30px;height:30px;border-radius: 50%;
+      background:
+        radial-gradient(ellipse 95% 85% at 35% 28%, rgba(255,255,255,.30) 0%, transparent 48%),
+        radial-gradient(ellipse 70% 55% at 78% 88%, rgba(255,255,255,.08) 0%, transparent 45%),
+        linear-gradient(152deg, var(--accent) 0%, var(--accent-600) 42%, var(--accent2) 100%);
+      box-shadow: 0 10px 22px rgba(0,0,0,.22), 0 0 0 2px rgba(255,255,255,.06);
+      flex-shrink:0;
+    }
+    .brand h2{
+      margin:0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing:.2px;
+    }
+    .brand p{
+      margin:0;
+      font-size: 11px;
+      color: var(--soft);
+      margin-top: 1px;
+    }
+    .pillRow{display:flex;gap:6px;align-items:center;flex-shrink:0}
+    .pill{
+      font-size: 10px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(var(--bg-surface-rgb), .40);
+      color: var(--soft);
+    }
+    .pill--accent{
+      background: rgba(0,0,0,.0);
+      border-color: color-mix(in oklab, var(--accent), rgba(255,255,255,.12) 40%);
+      color: color-mix(in oklab, var(--accent), #fff 25%);
+    }
+    .mock__body{
+      display:grid;
+      grid-template-columns: 140px 1fr;
+      height: calc(100% - 46px);
+    }
+    .sidebar{
+      border-right: 1px solid var(--border-subtle);
+      background: rgba(var(--bg-surface-rgb), .52);
+      backdrop-filter: blur(22px) saturate(170%);
+      padding: 10px;
+    }
+    .sTitle{
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      color: var(--soft);
+      margin-bottom: 10px;
+    }
+    .sItem{
+      display:flex;flex-direction:column;gap:2px;
+      padding: 8px 9px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(255,255,255,.03);
+      margin-bottom: 8px;
+    }
+    .sItem.active{
+      border-color: color-mix(in oklab, var(--accent), rgba(255,255,255,.10) 45%);
+      background: color-mix(in oklab, var(--accent), rgba(255,255,255,.00) 88%);
+    }
+    .sItem b{font-size: 11px}
+    .sItem span{font-size: 10px;color: var(--soft)}
+    .chat{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
+    .msgs{
+      flex:1;
+      padding: 12px 12px 8px;
+      overflow:hidden;
+      display:flex;flex-direction:column;gap:8px;
+    }
+    .row{display:flex;gap:8px;align-items:flex-start}
+    .row.you{justify-content:flex-end}
+    .avatar{
+      width: 22px;height:22px;border-radius: 7px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      flex-shrink:0;
+    }
+    .bubble{
+      max-width: 72%;
+      padding: 9px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(var(--bg-surface-rgb), .35);
+      color: var(--text);
+      font-size: 11px;
+      line-height: 1.35;
+      box-shadow: 0 10px 26px rgba(0,0,0,.18);
+    }
+    .bubble.agent{
+      border-color: rgba(255,255,255,.08);
+      background: rgba(var(--bg-surface-rgb), .38);
+    }
+    .bubble.you{
+      background: color-mix(in oklab, var(--accent), rgba(0,0,0,.00) 72%);
+      border-color: color-mix(in oklab, var(--accent), rgba(255,255,255,.10) 55%);
+    }
+    .kbd{
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      color: var(--soft);
+      display:inline-block;
+      margin-right: 6px;
+    }
+    .input{
+      padding: 10px 12px 12px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(var(--bg-surface-rgb), .60);
+      backdrop-filter: blur(18px) saturate(150%);
+      display:flex;gap:8px;align-items:center;
+    }
+    .field{
+      flex:1;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 9px 10px;
+      color: var(--soft);
+      background: rgba(255,255,255,.04);
+      font-size: 11px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .send{
+      width: 34px;height:34px;border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 10px 22px rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    /* Theme token block */
+    .tokens{
+      display:none;
+      padding: 10px 12px 12px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      background: rgba(0,0,0,.14);
+      color: rgba(255,255,255,.86);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre;
+      overflow:auto;
+      max-height: 140px;
+    }
+    .theme.showTokens .tokens{display:block}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="hgroup">
+        <h1>Theme Mockups (10 bộ màu)</h1>
+        <p class="sub">Mỗi card bên dưới là một “mini Oculo UI” dùng CSS variables tương tự. Bấm <b>Copy tokens</b> để lấy bộ biến màu, hoặc <b>Tokens</b> để xem nhanh.</p>
+        <div class="tip">
+          Gợi ý: chọn palette theo <b>mục tiêu</b> (calm / pro / playful / high-contrast) và theo <b>môi trường</b> (dark room vs daylight).
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="expandAll">Mở tokens (tất cả)</button>
+        <button class="btn" id="collapseAll">Đóng tokens</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid">
+      <!-- 1 -->
+      <section class="theme" data-theme-name="Aurora Violet">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Aurora Violet</div>
+          <div class="theme__meta">Indigo/Violet · “default-like”</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#0b0f19;
+            --bg-surface-rgb:18,22,35;
+            --text:#eaf0ff;
+            --soft:rgba(234,240,255,.72);
+            --border-subtle:rgba(255,255,255,.08);
+            --border-strong:rgba(255,255,255,.16);
+            --accent:#7c9fff;
+            --accent-600:#5b7cff;
+            --accent2:#a78bfa;
+            --mesh-a:rgba(124,159,255,.55);
+            --mesh-b:rgba(167,139,250,.45);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div>
+                  <h2>Oculo</h2>
+                  <p>macOS · Agent</p>
+                </div>
+              </div>
+              <div class="pillRow">
+                <span class="pill pill--accent">Sonnet</span>
+                <span class="pill">⌥M</span>
+              </div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Fix bug UI</b><span>đang làm…</span></div>
+                <div class="sItem"><b>Roadmap</b><span>ý tưởng</span></div>
+                <div class="sItem"><b>Notes</b><span>lưu nhanh</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình có thể test end‑to‑end và bắt lỗi streaming/abort. Bạn muốn ưu tiên luồng nào?</div>
+                  </div>
+                  <div class="row you">
+                    <div class="bubble you"><span class="kbd">Enter</span>Test chat + abort</div>
+                  </div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">OK. Mình mock SSE, kiểm tra render markdown, và verify nút dừng gọi đúng endpoint.</div>
+                  </div>
+                </div>
+                <div class="input">
+                  <div class="field">Giao việc cho Oculo…</div>
+                  <div class="send"></div>
+                </div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Aurora Violet */
+:root{
+  --bg-page:#0b0f19;
+  --bg-surface-rgb:18,22,35;
+  --text:#eaf0ff;
+  --soft:rgba(234,240,255,.72);
+  --border-subtle:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.16);
+  --accent:#7c9fff;
+  --accent-600:#5b7cff;
+  --accent2:#a78bfa;
+  --mesh-a:rgba(124,159,255,.55);
+  --mesh-b:rgba(167,139,250,.45);
+}</pre>
+      </section>
+
+      <!-- 2 -->
+      <section class="theme" data-theme-name="Emerald Glass">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Emerald Glass</div>
+          <div class="theme__meta">Green/Teal · calm, “ops dashboard”</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#061312;
+            --bg-surface-rgb:10,24,24;
+            --text:#e7fff8;
+            --soft:rgba(231,255,248,.70);
+            --border-subtle:rgba(255,255,255,.08);
+            --border-strong:rgba(255,255,255,.16);
+            --accent:#34d399;
+            --accent-600:#10b981;
+            --accent2:#22d3ee;
+            --mesh-a:rgba(34,211,238,.40);
+            --mesh-b:rgba(52,211,153,.42);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Monitor · Memory</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Ops</span><span class="pill">⌘K</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>System monitor</b><span>CPU/RAM</span></div>
+                <div class="sItem"><b>Logs</b><span>events</span></div>
+                <div class="sItem"><b>Alerts</b><span>notify</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình sẽ theo dõi thư mục và gửi notification khi có thay đổi. Bạn muốn tần suất bao lâu?</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Mỗi 30s</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">OK. Nếu quá nhiều event, mình sẽ debounce để UI không lag.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Nhập yêu cầu…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Emerald Glass */
+:root{
+  --bg-page:#061312;
+  --bg-surface-rgb:10,24,24;
+  --text:#e7fff8;
+  --soft:rgba(231,255,248,.70);
+  --border-subtle:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.16);
+  --accent:#34d399;
+  --accent-600:#10b981;
+  --accent2:#22d3ee;
+  --mesh-a:rgba(34,211,238,.40);
+  --mesh-b:rgba(52,211,153,.42);
+}</pre>
+      </section>
+
+      <!-- 3 -->
+      <section class="theme" data-theme-name="Solar Amber">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Solar Amber</div>
+          <div class="theme__meta">Amber/Gold · energetic, tool-running vibe</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#120c06;
+            --bg-surface-rgb:28,18,10;
+            --text:#fff2de;
+            --soft:rgba(255,242,222,.70);
+            --border-subtle:rgba(255,255,255,.09);
+            --border-strong:rgba(255,255,255,.18);
+            --accent:#fbbf24;
+            --accent-600:#f59e0b;
+            --accent2:#fb923c;
+            --mesh-a:rgba(251,146,60,.42);
+            --mesh-b:rgba(251,191,36,.35);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Tools · Automation</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Tool</span><span class="pill">Esc</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Auto tasks</b><span>pipeline</span></div>
+                <div class="sItem"><b>Checklist</b><span>QA</span></div>
+                <div class="sItem"><b>Exports</b><span>PDF/JSON</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình chuẩn bị chạy shell và ghi file. Bật cảnh báo “risk-warn” nhé?</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Bật</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">OK. Mọi thao tác “nguy hiểm” sẽ có banner xác nhận.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Task…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Solar Amber */
+:root{
+  --bg-page:#120c06;
+  --bg-surface-rgb:28,18,10;
+  --text:#fff2de;
+  --soft:rgba(255,242,222,.70);
+  --border-subtle:rgba(255,255,255,.09);
+  --border-strong:rgba(255,255,255,.18);
+  --accent:#fbbf24;
+  --accent-600:#f59e0b;
+  --accent2:#fb923c;
+  --mesh-a:rgba(251,146,60,.42);
+  --mesh-b:rgba(251,191,36,.35);
+}</pre>
+      </section>
+
+      <!-- 4 -->
+      <section class="theme" data-theme-name="Rose Quartz">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Rose Quartz</div>
+          <div class="theme__meta">Rose/Pink · friendly, social</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#140910;
+            --bg-surface-rgb:30,14,22;
+            --text:#ffe8f2;
+            --soft:rgba(255,232,242,.70);
+            --border-subtle:rgba(255,255,255,.09);
+            --border-strong:rgba(255,255,255,.18);
+            --accent:#fb7185;
+            --accent-600:#f43f5e;
+            --accent2:#a78bfa;
+            --mesh-a:rgba(251,113,133,.42);
+            --mesh-b:rgba(167,139,250,.32);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Chat · Creativity</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Temp 0.9</span><span class="pill">⌥/</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Ideas</b><span>brainstorm</span></div>
+                <div class="sItem"><b>Copy</b><span>snippets</span></div>
+                <div class="sItem"><b>Draft</b><span>notes</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình có thể đề xuất 5 tone khác nhau cho landing page và copywriting.</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">OK, làm đi</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Bắt đầu với tone “minimal & premium”…</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Giao việc…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Rose Quartz */
+:root{
+  --bg-page:#140910;
+  --bg-surface-rgb:30,14,22;
+  --text:#ffe8f2;
+  --soft:rgba(255,232,242,.70);
+  --border-subtle:rgba(255,255,255,.09);
+  --border-strong:rgba(255,255,255,.18);
+  --accent:#fb7185;
+  --accent-600:#f43f5e;
+  --accent2:#a78bfa;
+  --mesh-a:rgba(251,113,133,.42);
+  --mesh-b:rgba(167,139,250,.32);
+}</pre>
+      </section>
+
+      <!-- 5 -->
+      <section class="theme" data-theme-name="Cyan Night">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Cyan Night</div>
+          <div class="theme__meta">Cyan/Blue · sharp, “terminal-ish”</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#040b12;
+            --bg-surface-rgb:8,18,28;
+            --text:#e7f7ff;
+            --soft:rgba(231,247,255,.70);
+            --border-subtle:rgba(255,255,255,.08);
+            --border-strong:rgba(255,255,255,.16);
+            --accent:#22d3ee;
+            --accent-600:#06b6d4;
+            --accent2:#60a5fa;
+            --mesh-a:rgba(96,165,250,.35);
+            --mesh-b:rgba(34,211,238,.35);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Browser · Live view</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Browser</span><span class="pill">⌘2</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Browse</b><span>playwright</span></div>
+                <div class="sItem"><b>Vision</b><span>dom</span></div>
+                <div class="sItem"><b>Files</b><span>read/write</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình đang điều khiển browser. Bạn muốn chặn ảnh/fonts để tăng tốc không?</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Có</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">OK. Mình sẽ block resources nặng và retry khi timeout.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Mở Safari…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Cyan Night */
+:root{
+  --bg-page:#040b12;
+  --bg-surface-rgb:8,18,28;
+  --text:#e7f7ff;
+  --soft:rgba(231,247,255,.70);
+  --border-subtle:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.16);
+  --accent:#22d3ee;
+  --accent-600:#06b6d4;
+  --accent2:#60a5fa;
+  --mesh-a:rgba(96,165,250,.35);
+  --mesh-b:rgba(34,211,238,.35);
+}</pre>
+      </section>
+
+      <!-- 6 -->
+      <section class="theme" data-theme-name="Tangerine">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Tangerine</div>
+          <div class="theme__meta">Orange/Red · playful, CTA pop</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#120707;
+            --bg-surface-rgb:28,12,12;
+            --text:#ffe9e3;
+            --soft:rgba(255,233,227,.70);
+            --border-subtle:rgba(255,255,255,.09);
+            --border-strong:rgba(255,255,255,.18);
+            --accent:#fb923c;
+            --accent-600:#f97316;
+            --accent2:#f43f5e;
+            --mesh-a:rgba(244,63,94,.30);
+            --mesh-b:rgba(251,146,60,.40);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Quick actions</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Fast</span><span class="pill">/</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Hotfix</b><span>today</span></div>
+                <div class="sItem"><b>Backlog</b><span>later</span></div>
+                <div class="sItem"><b>Changelog</b><span>release</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Nút “Dừng” sẽ luôn nổi rõ. Nếu stream bị treo, UI sẽ tự resume để không kẹt.</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Nice</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mình cũng thêm handling quota localStorage để tránh crash.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Nhập…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Tangerine */
+:root{
+  --bg-page:#120707;
+  --bg-surface-rgb:28,12,12;
+  --text:#ffe9e3;
+  --soft:rgba(255,233,227,.70);
+  --border-subtle:rgba(255,255,255,.09);
+  --border-strong:rgba(255,255,255,.18);
+  --accent:#fb923c;
+  --accent-600:#f97316;
+  --accent2:#f43f5e;
+  --mesh-a:rgba(244,63,94,.30);
+  --mesh-b:rgba(251,146,60,.40);
+}</pre>
+      </section>
+
+      <!-- 7 -->
+      <section class="theme" data-theme-name="Slate Pro">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Slate Pro</div>
+          <div class="theme__meta">Neutral blue-gray · enterprise, low-distraction</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#0b0f14;
+            --bg-surface-rgb:17,22,30;
+            --text:#e7edf7;
+            --soft:rgba(231,237,247,.68);
+            --border-subtle:rgba(255,255,255,.07);
+            --border-strong:rgba(255,255,255,.15);
+            --accent:#60a5fa;
+            --accent-600:#3b82f6;
+            --accent2:#a3e635;
+            --mesh-a:rgba(96,165,250,.35);
+            --mesh-b:rgba(163,230,53,.22);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Work · Focus</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Stable</span><span class="pill">⌘F</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Spec</b><span>docs</span></div>
+                <div class="sItem"><b>QA</b><span>cases</span></div>
+                <div class="sItem"><b>PR</b><span>review</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Theme này ưu tiên contrast ổn định, ít chói, phù hợp làm việc lâu.</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">OK</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Accent phụ xanh lá để highlight state “success”.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Search / chat…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Slate Pro */
+:root{
+  --bg-page:#0b0f14;
+  --bg-surface-rgb:17,22,30;
+  --text:#e7edf7;
+  --soft:rgba(231,237,247,.68);
+  --border-subtle:rgba(255,255,255,.07);
+  --border-strong:rgba(255,255,255,.15);
+  --accent:#60a5fa;
+  --accent-600:#3b82f6;
+  --accent2:#a3e635;
+  --mesh-a:rgba(96,165,250,.35);
+  --mesh-b:rgba(163,230,53,.22);
+}</pre>
+      </section>
+
+      <!-- 8 -->
+      <section class="theme" data-theme-name="Mono High Contrast">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Mono High Contrast</div>
+          <div class="theme__meta">B/W + single accent · accessibility-first</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#050607;
+            --bg-surface-rgb:12,13,15;
+            --text:#f4f6f8;
+            --soft:rgba(244,246,248,.72);
+            --border-subtle:rgba(255,255,255,.12);
+            --border-strong:rgba(255,255,255,.22);
+            --accent:#a3e635;
+            --accent-600:#84cc16;
+            --accent2:#22d3ee;
+            --mesh-a:rgba(163,230,53,.30);
+            --mesh-b:rgba(34,211,238,.20);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>A11y · Contrast</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">HC</span><span class="pill">Tab</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Keyboard</b><span>nav</span></div>
+                <div class="sItem"><b>Screen reader</b><span>a11y</span></div>
+                <div class="sItem"><b>Color</b><span>contrast</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Mono + accent giúp đọc dễ hơn. Border mạnh để phân tách vùng rõ ràng.</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Được</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Dùng tốt cho daylight hoặc người nhạy cảm màu sắc.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Type…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Mono High Contrast */
+:root{
+  --bg-page:#050607;
+  --bg-surface-rgb:12,13,15;
+  --text:#f4f6f8;
+  --soft:rgba(244,246,248,.72);
+  --border-subtle:rgba(255,255,255,.12);
+  --border-strong:rgba(255,255,255,.22);
+  --accent:#a3e635;
+  --accent-600:#84cc16;
+  --accent2:#22d3ee;
+  --mesh-a:rgba(163,230,53,.30);
+  --mesh-b:rgba(34,211,238,.20);
+}</pre>
+      </section>
+
+      <!-- 9 -->
+      <section class="theme" data-theme-name="Forest Ink">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Forest Ink</div>
+          <div class="theme__meta">Deep green + purple · “mystic”, premium</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#07110b;
+            --bg-surface-rgb:12,26,18;
+            --text:#eafff2;
+            --soft:rgba(234,255,242,.68);
+            --border-subtle:rgba(255,255,255,.08);
+            --border-strong:rgba(255,255,255,.16);
+            --accent:#a3e635;
+            --accent-600:#65a30d;
+            --accent2:#c084fc;
+            --mesh-a:rgba(192,132,252,.28);
+            --mesh-b:rgba(163,230,53,.28);
+          ">
+          <div class="mock__glass">
+            <div class="mock__header">
+              <div class="brand">
+                <div class="orb"></div>
+                <div><h2>Oculo</h2><p>Memory · Long-term</p></div>
+              </div>
+              <div class="pillRow"><span class="pill pill--accent">Memory</span><span class="pill">⌥/</span></div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active"><b>Preferences</b><span>store</span></div>
+                <div class="sItem"><b>Summaries</b><span>compact</span></div>
+                <div class="sItem"><b>Search</b><span>embeddings</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Theme này hợp với UI “memory/knowledge” — cảm giác sâu và yên.</div>
+                  </div>
+                  <div class="row you"><div class="bubble you">Ok</div></div>
+                  <div class="row">
+                    <div class="avatar"></div>
+                    <div class="bubble agent">Accent xanh lá cho “saved”, tím cho “insight”.</div>
+                  </div>
+                </div>
+                <div class="input"><div class="field">Thêm ghi nhớ…</div><div class="send"></div></div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Forest Ink */
+:root{
+  --bg-page:#07110b;
+  --bg-surface-rgb:12,26,18;
+  --text:#eafff2;
+  --soft:rgba(234,255,242,.68);
+  --border-subtle:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.16);
+  --accent:#a3e635;
+  --accent-600:#65a30d;
+  --accent2:#c084fc;
+  --mesh-a:rgba(192,132,252,.28);
+  --mesh-b:rgba(163,230,53,.28);
+}</pre>
+      </section>
+
+      <!-- 10 -->
+      <section class="theme" data-theme-name="Lavender Daylight">
+        <div class="theme__head">
+          <div class="theme__name"><span class="swatch"></span>Lavender Daylight</div>
+          <div class="theme__meta">Light theme · pastel, soft shadows</div>
+          <div class="theme__actions">
+            <button class="miniBtn" data-action="toggleTokens">Tokens</button>
+            <button class="miniBtn" data-action="copyTokens">Copy tokens</button>
+          </div>
+        </div>
+        <div class="mock"
+          style="
+            --bg-page:#f6f3ff;
+            --bg-surface-rgb:255,255,255;
+            --text:#0b1220;
+            --soft:rgba(11,18,32,.62);
+            --border-subtle:rgba(11,18,32,.10);
+            --border-strong:rgba(11,18,32,.18);
+            --accent:#6d28d9;
+            --accent-600:#5b21b6;
+            --accent2:#2563eb;
+            --mesh-a:rgba(109,40,217,.18);
+            --mesh-b:rgba(37,99,235,.14);
+          ">
+          <div class="mock__glass" style="box-shadow: 0 18px 55px rgba(24, 22, 42, .12);">
+            <div class="mock__header" style="box-shadow:none">
+              <div class="brand">
+                <div class="orb" style="box-shadow: 0 10px 26px rgba(42, 36, 90, .16), 0 0 0 2px rgba(0,0,0,.04)"></div>
+                <div><h2>Oculo</h2><p>Light · Clean</p></div>
+              </div>
+              <div class="pillRow">
+                <span class="pill pill--accent" style="background: rgba(109,40,217,.10)">Light</span>
+                <span class="pill" style="background: rgba(11,18,32,.04)">⌥M</span>
+              </div>
+            </div>
+            <div class="mock__body">
+              <aside class="sidebar" style="background: rgba(255,255,255,.70)">
+                <div class="sTitle">Hội thoại</div>
+                <div class="sItem active" style="background: rgba(109,40,217,.08)"><b>Daily</b><span>work</span></div>
+                <div class="sItem"><b>Meetings</b><span>notes</span></div>
+                <div class="sItem"><b>Tasks</b><span>todo</span></div>
+              </aside>
+              <main class="chat">
+                <div class="msgs">
+                  <div class="row">
+                    <div class="avatar" style="background: rgba(11,18,32,.05); border-color: rgba(11,18,32,.08)"></div>
+                    <div class="bubble agent" style="background: rgba(255,255,255,.78); border-color: rgba(11,18,32,.10); box-shadow: 0 12px 30px rgba(24,22,42,.10)">Theme sáng phù hợp dùng ban ngày, giảm mỏi mắt, vẫn giữ accent rõ.</div>
+                  </div>
+                  <div class="row you">
+                    <div class="bubble you" style="box-shadow: 0 12px 30px rgba(24,22,42,.10)">Ok</div>
+                  </div>
+                  <div class="row">
+                    <div class="avatar" style="background: rgba(11,18,32,.05); border-color: rgba(11,18,32,.08)"></div>
+                    <div class="bubble agent" style="background: rgba(255,255,255,.78); border-color: rgba(11,18,32,.10); box-shadow: 0 12px 30px rgba(24,22,42,.10)">Glassmorphism nhẹ + mesh pastel.</div>
+                  </div>
+                </div>
+                <div class="input" style="background: rgba(255,255,255,.75)">
+                  <div class="field" style="background: rgba(11,18,32,.04); border-color: rgba(11,18,32,.10)">Giao việc…</div>
+                  <div class="send"></div>
+                </div>
+              </main>
+            </div>
+          </div>
+        </div>
+        <pre class="tokens">/* Lavender Daylight (light) */
+:root{
+  --bg-page:#f6f3ff;
+  --bg-surface-rgb:255,255,255;
+  --text:#0b1220;
+  --soft:rgba(11,18,32,.62);
+  --border-subtle:rgba(11,18,32,.10);
+  --border-strong:rgba(11,18,32,.18);
+  --accent:#6d28d9;
+  --accent-600:#5b21b6;
+  --accent2:#2563eb;
+  --mesh-a:rgba(109,40,217,.18);
+  --mesh-b:rgba(37,99,235,.14);
+}</pre>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied</div>
+
+  <script>
+    const toast = document.getElementById('toast');
+    let toastT = null;
+    function showToast(text){
+      toast.textContent = text;
+      toast.classList.add('show');
+      clearTimeout(toastT);
+      toastT = setTimeout(()=>toast.classList.remove('show'), 1100);
+    }
+
+    function getTokens(el){
+      const pre = el.querySelector('.tokens');
+      return pre ? pre.textContent.trim() : '';
+    }
+
+    document.getElementById('grid').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if(!btn) return;
+      const theme = btn.closest('.theme');
+      if(!theme) return;
+      const action = btn.getAttribute('data-action');
+
+      if(action === 'toggleTokens'){
+        theme.classList.toggle('showTokens');
+        return;
+      }
+
+      if(action === 'copyTokens'){
+        const tokens = getTokens(theme);
+        try{
+          await navigator.clipboard.writeText(tokens + "\n");
+          showToast('Copied tokens: ' + (theme.dataset.themeName || 'theme'));
+        }catch(err){
+          // Fallback: select text
+          theme.classList.add('showTokens');
+          const pre = theme.querySelector('.tokens');
+          const r = document.createRange();
+          r.selectNodeContents(pre);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+          showToast('Select + copy (clipboard blocked)');
+        }
+      }
+    });
+
+    document.getElementById('expandAll').addEventListener('click', ()=>{
+      document.querySelectorAll('.theme').forEach(t => t.classList.add('showTokens'));
+    });
+    document.getElementById('collapseAll').addEventListener('click', ()=>{
+      document.querySelectorAll('.theme').forEach(t => t.classList.remove('showTokens'));
+    });
+  </script>
+</body>
+</html>
+

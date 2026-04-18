@@ -1,0 +1,36 @@
+**/.DS_Store
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+
+# Local env / secrets
+ai-agent/.env
+
+# Virtualenv + build artifacts
+ai-agent/venv/
+ai-agent/dist/
+ai-agent/build/*
+!ai-agent/build/macos/
+!ai-agent/build/macos/build_app.sh
+!ai-agent/build/macos/make_dmg.sh
+ai-agent/Oculo.spec
+ai-agent/static/dist/
+ai-agent/build/**/__pycache__/
+
+# Local runtime data
+ai-agent/browser_data/
+ai-agent/data/
+ai-agent/memory/chroma_db/
+
+# Node
+ai-agent/node_modules/
+
+# Editor / assistant configs
+.vscode/
+.claude/

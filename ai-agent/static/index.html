@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Oculo — Trợ lý AI nhìn thấu mọi việc</title>
+  <meta name="description" content="Oculo là trợ lý AI thông minh điều khiển macOS, duyệt web, đọc/ghi file, phân tích ảnh và tự động hóa mọi tác vụ bằng Claude AI.">
+  <meta name="keywords" content="Oculo, AI agent, trợ lý AI, tự động hóa macOS, Claude AI, AI assistant">
+  <meta name="author" content="Oculo">
+  <meta property="og:title" content="Oculo — Trợ lý AI nhìn thấu mọi việc">
+  <meta property="og:description" content="Trợ lý AI thông minh điều khiển macOS, duyệt web, đọc/ghi file và tự động hóa mọi tác vụ.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Oculo — Trợ lý AI nhìn thấu mọi việc">
+  <meta name="twitter:description" content="Trợ lý AI thông minh điều khiển macOS, duyệt web và tự động hóa mọi tác vụ.">
+  <link rel="icon" type="image/svg+xml" id="app-favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c9fff'/%3E%3Cstop offset='1' stop-color='%23a78bfa'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%23fff' stroke-width='3' stroke-opacity='.9'/%3E%3Cline x1='32' y1='20' x2='32' y2='32' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='32' y1='32' x2='41' y2='38' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='32' r='3' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c9fff'/%3E%3Cstop offset='1' stop-color='%23a78bfa'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='38' fill='url(%23g)'/%3E%3Ccircle cx='90' cy='90' r='44' fill='none' stroke='%23fff' stroke-width='7' stroke-opacity='.9'/%3E%3Cline x1='90' y1='56' x2='90' y2='90' stroke='%23fff' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='90' y1='90' x2='114' y2='106' stroke='%23fff' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='90' cy='90' r='8' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" id="hljs-theme-link">
+  <link rel="stylesheet" href="/static/style.css?v=5">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Oculo">
+  <script defer src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- Gán sự kiện qua data-oculo trong app.js (hàm vẫn trên window) -->
+  <script defer src="/static/app.js?v=8"></script>
+</head>
+<body data-theme="dark">
+
+<div class="ambient-bg" aria-hidden="true"></div>
+
+<a class="skip-link" href="#user-input">Bỏ qua đến ô nhập</a>
+
+<!-- Sidebar (multi-conversation) -->
+<div id="sidebar-backdrop" class="sidebar-backdrop" data-oculo="closeSidebar" aria-hidden="true"></div>
+<aside id="sidebar" aria-label="Danh sách hội thoại">
+  <div class="sidebar-head">
+    <span class="sidebar-title">Hội thoại</span>
+    <button type="button" class="sidebar-new-btn" data-oculo="newConversation" title="Tạo mới (Ctrl+N)" aria-label="Tạo hội thoại mới">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+  <div class="sidebar-search-wrap">
+    <span class="sidebar-search-icon">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </span>
+    <input class="sidebar-search" id="conv-search" placeholder="Tìm hội thoại..." autocomplete="off" aria-label="Tìm hội thoại">
+    <button type="button" class="sidebar-search-clear" id="conv-search-clear" data-oculo="clearConvSearch" aria-label="Xóa tìm kiếm" hidden>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="conv-list" id="conv-list"></div>
+</aside>
+
+<!-- Keyboard Shortcuts Modal -->
+<div class="modal-overlay" id="shortcuts-modal">
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title">
+    <h3 id="shortcuts-modal-title">Phím tắt</h3>
+    <div class="shortcuts-section">
+      <div class="shortcuts-section-title">Nhập liệu</div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><span class="shortcut-desc">Gửi tin nhắn</span><div class="shortcut-keys"><span class="kbd">Enter</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Xuống dòng</span><div class="shortcut-keys"><span class="kbd">Shift</span><span class="kbd-plus">+</span><span class="kbd">Enter</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Focus vào input</span><div class="shortcut-keys"><span class="kbd">/</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Chọn model</span><div class="shortcut-keys"><span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">M</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Hội thoại mới</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">N</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Mở bảng phím tắt</span><div class="shortcut-keys"><span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">/</span></div></div>
+      </div>
+    </div>
+    <div class="shortcuts-section">
+      <div class="shortcuts-section-title">Điều hướng</div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><span class="shortcut-desc">Chế độ Chat</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">1</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Chế độ Điều khiển</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">2</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Tìm kiếm</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">F</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Đóng tìm kiếm</span><div class="shortcut-keys"><span class="kbd">Esc</span></div></div>
+      </div>
+    </div>
+    <div class="shortcuts-section">
+      <div class="shortcuts-section-title">Chat</div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><span class="shortcut-desc">Xóa chat</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">K</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Dừng agent</span><div class="shortcut-keys"><span class="kbd">Esc</span><span class="shortcut-hint">(khi đang chạy)</span></div></div>
+      </div>
+    </div>
+    <p class="shortcuts-platform-hint">Trên <strong>Windows</strong> / <strong>Linux</strong>: dùng <span class="kbd">Ctrl</span> thay cho <span class="kbd">⌘</span> (Command), <span class="kbd">Alt</span> thay cho <span class="kbd">⌥</span> (Option).</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:shortcuts-modal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Skills Modal -->
+<div class="modal-overlay" id="skills-modal">
+  <div class="modal modal--wider" role="dialog" aria-modal="true" aria-labelledby="skills-modal-title">
+    <h3 id="skills-modal-title">Kỹ năng</h3>
+    <p class="modal-lede">Chọn một kỹ năng để agent hoạt động theo chuyên môn đó. Mỗi kỹ năng có system prompt và phong cách riêng.</p>
+    <div class="skills-grid" id="skills-grid"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:skills-modal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Skill Editor Modal -->
+<div class="modal-overlay" id="skill-editor-modal">
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="skill-editor-title">
+    <h3 id="skill-editor-title">Tạo kỹ năng mới</h3>
+    <input type="hidden" id="skill-editor-id">
+    <div class="field">
+      <label for="skill-icon-picker">Icon</label>
+      <div class="skill-icon-picker" id="skill-icon-picker"></div>
+    </div>
+    <div class="field">
+      <label for="skill-name">Tên kỹ năng</label>
+      <input id="skill-name" placeholder="vd: Chuyên gia Python">
+    </div>
+    <div class="field">
+      <label for="skill-desc">Mô tả ngắn</label>
+      <input id="skill-desc" placeholder="vd: Viết code Python sạch, có type hints">
+    </div>
+    <div class="field">
+      <label for="skill-prompt">System Prompt</label>
+      <textarea id="skill-prompt" rows="6" placeholder="Nhập hướng dẫn cho agent khi dùng skill này..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:skill-editor-modal">Hủy</button>
+      <button class="btn btn-primary" data-oculo="saveSkill">Lưu kỹ năng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <h3 id="settings-modal-title">Cấu hình Agent</h3>
+    <div class="field">
+      <label>Model &amp; nhà cung cấp</label>
+      <select id="cfg-model" aria-describedby="cfg-model-detail"></select>
+      <p class="cfg-model-detail" id="cfg-model-detail" hidden></p>
+    </div>
+    <div class="field">
+      <label>Độ sáng tạo (Temperature)</label>
+      <div class="range-wrap">
+        <input type="range" id="cfg-temp" min="0" max="1" step="0.05" value="1.0">
+        <span class="range-val" id="temp-display">1.0</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>System Prompt</label>
+      <textarea id="cfg-system" rows="6"></textarea>
+    </div>
+    <fieldset class="field field--ux">
+      <legend class="field-legend">Trải nghiệm &amp; tin cậy</legend>
+      <label class="ux-check">
+        <input type="checkbox" id="cfg-enable-ollama">
+        Bật dùng Ollama (tắt = không dùng model Ollama)
+      </label>
+      <label class="ux-check">
+        <input type="checkbox" id="cfg-followups" checked>
+        Gợi ý câu hỏi tiếp theo sau mỗi lượt trả lời
+      </label>
+      <label class="ux-check">
+        <input type="checkbox" id="cfg-risk-warn">
+        Cảnh báo khi agent chuẩn bị chạy shell hoặc ghi file (nhắc trên giao diện)
+      </label>
+    </fieldset>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:settings-modal">Hủy</button>
+      <button class="btn btn-primary" data-oculo="saveSettings">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pipeline Modal -->
+<div class="modal-overlay" id="pipeline-modal">
+  <div class="modal modal--wider" role="dialog" aria-modal="true" aria-labelledby="pipeline-modal-title">
+    <h3 id="pipeline-modal-title">Pipeline Đa Agent</h3>
+    <p class="modal-lede modal-lede--tight">Chia task phức tạp thành 3 agent chạy tuần tự: Nghiên cứu → Thực thi → Đánh giá.</p>
+    <div class="field">
+      <label>Mô tả công việc</label>
+      <textarea id="pipeline-task" class="pipeline-task-input" rows="3" placeholder="Ví dụ: Nghiên cứu top 5 công cụ AI năm 2025, tóm tắt và lưu vào ~/Desktop/ai-tools.md"></textarea>
+    </div>
+    <div id="pipeline-output" class="pipeline-output-wrap" hidden></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:pipeline-modal">Đóng</button>
+      <button class="btn btn-primary" id="pipeline-run-btn" data-oculo="runPipeline">Chạy Pipeline</button>
+    </div>
+  </div>
+</div>
+
+<!-- Checkpoints (snapshot trước mỗi bước công cụ — server) -->
+<div class="modal-overlay" id="checkpoint-modal">
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="checkpoint-modal-title">
+    <h3 id="checkpoint-modal-title">Checkpoint hội thoại</h3>
+    <p class="modal-lede modal-lede--tight">Các bản chụp được lưu trên server trước khi agent gọi công cụ (tối đa 20, TTL ~1 giờ). Khôi phục sẽ thay nội dung hội thoại hiện tại.</p>
+    <div id="cp-list" class="cp-list"><p class="modal-placeholder-text">Đang tải...</p></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" data-oculo="closeModal:checkpoint-modal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memory Modal -->
+<div class="modal-overlay" id="memory-modal">
+  <div class="modal modal--memory" role="dialog" aria-modal="true" aria-labelledby="memory-modal-title">
+    <h3 id="memory-modal-title">Bộ nhớ dài hạn</h3>
+    <input class="mem-search" id="mem-search" placeholder="Tìm kiếm trong bộ nhớ...">
+    <div id="mem-list"><p class="modal-placeholder-text">Đang tải...</p></div>
+    <div class="mem-add-row">
+      <input id="mem-add-input" class="mem-add-input" placeholder="Thêm ghi nhớ thủ công...">
+      <button class="btn btn-primary btn--compact" data-oculo="addMemoryManual">Thêm</button>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost confirm-danger" data-oculo="openClearMemoryConfirm">Xóa tất cả</button>
+      <button type="button" class="btn btn-ghost" data-oculo="closeModal:memory-modal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm (thay thế window.confirm) -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal modal--narrow" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h3 id="confirm-title">Xác nhận</h3>
+    <p id="confirm-message" class="confirm-message"></p>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" data-oculo="confirmModalCancel">Hủy</button>
+      <button type="button" class="btn btn-primary" id="confirm-ok-btn" data-oculo="confirmModalExecute">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<!-- Monitor Modal -->
+<div class="modal-overlay" id="monitor-modal">
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="monitor-modal-title">
+    <h3 id="monitor-modal-title">Giám sát chủ động</h3>
+    <div id="mon-list"><p class="modal-placeholder-text">Chưa có monitor nào đang chạy.</p></div>
+    <div class="add-mon-form">
+      <select id="mon-type">
+        <option value="file">Theo dõi thư mục/file</option>
+        <option value="calendar">Theo dõi Lịch (Calendar)</option>
+        <option value="system">Theo dõi hệ thống (CPU/RAM)</option>
+      </select>
+      <input id="mon-path" placeholder="Đường dẫn theo dõi (chỉ dùng cho file monitor, vd: ~/Desktop)" value="~/Desktop">
+      <button class="btn btn-primary" data-oculo="addMonitor">Thêm Monitor</button>
+    </div>
+    <div id="mon-events" class="mon-events-block">
+      <div class="mon-events-title">Sự kiện gần đây</div>
+      <div id="mon-events-list" class="mon-events-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-oculo="closeModal:monitor-modal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="offline-banner" class="offline-banner" hidden>
+  ⚠ Mất kết nối mạng — một số tính năng có thể không hoạt động
+</div>
+
+<header>
+  <div class="header-cluster header-cluster--brand" role="group" aria-label="Thương hiệu và điều hướng">
+  <button type="button" id="sidebar-toggle" data-oculo="toggleSidebar" title="Hội thoại" aria-label="Mở hoặc đóng danh sách hội thoại" aria-expanded="false" aria-controls="sidebar">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <!-- #2 Sidebar edge indicator — gợi ý sidebar tồn tại -->
+  <div id="sidebar-edge" class="sidebar-edge" aria-hidden="true"></div>
+  <div class="logo" id="header-logo">
+    <div class="agent-eye-avatar" aria-hidden="true">
+      <span class="agent-eye agent-eye--l">
+        <span class="agent-eye-sclera">
+          <span class="agent-eye-track">
+            <span class="agent-eye-iris"><span class="agent-eye-pupil"></span></span>
+          </span>
+        </span>
+      </span>
+      <span class="agent-eye agent-eye--r">
+        <span class="agent-eye-sclera">
+          <span class="agent-eye-track">
+            <span class="agent-eye-iris"><span class="agent-eye-pupil"></span></span>
+          </span>
+        </span>
+      </span>
+    </div>
+  </div>
+  <div class="brand-block">
+    <div class="htitle">Oculo</div>
+    <div class="hsub" id="hsub-line">macOS · Agent</div>
+  </div>
+  </div>
+  <div class="header-cluster header-cluster--model" role="group" aria-label="Chọn model AI">
+  <div class="header-model-slot" id="header-model-slot" title="⌥M đổi model">
+    <div class="model-switcher-wrap" id="model-switcher-wrap">
+      <button type="button" class="model-switcher-btn model-switcher-btn--header" id="model-switcher-btn" data-oculo="toggleModelPicker" aria-expanded="false" aria-haspopup="listbox" aria-controls="model-picker-panel" aria-describedby="header-model-desc" title="Chọn model AI · ⌥M">
+        <span class="model-switcher-text">
+          <span class="model-switcher-name" id="header-model-name">—</span>
+          <span class="model-switcher-provider model-switcher-provider--compact" id="header-provider-name">—</span>
+        </span>
+        <span class="model-switcher-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </button>
+      <div class="model-picker-panel model-picker-panel--header" id="model-picker-panel" role="listbox" aria-label="Chọn model" hidden>
+        <div class="model-picker-search-wrap">
+          <input type="search" id="model-picker-search" class="model-picker-search" placeholder="Lọc theo tên hoặc ID…" autocomplete="off" aria-label="Lọc model">
+        </div>
+        <div class="model-picker-scroll" id="model-picker-groups">
+          <!-- #15 Loading skeleton hiện khi chưa load xong -->
+          <div class="model-picker-loading" id="model-picker-loading">
+            <div class="mpk-skeleton"></div>
+            <div class="mpk-skeleton mpk-skeleton--short"></div>
+            <div class="mpk-skeleton"></div>
+            <div class="mpk-skeleton mpk-skeleton--short"></div>
+          </div>
+        </div>
+        <p class="model-picker-hint" id="header-model-desc">Chọn model cho lượt tiếp theo. Menu <strong>Cấu hình</strong> để chỉnh temperature và system prompt.</p>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="header-cluster header-cluster--tools hright" role="group" aria-label="Chế độ làm việc và công cụ">
+    <!-- Mode switch with slide indicator -->
+    <div class="mode-switch" id="mode-switch">
+      <div class="mode-indicator" id="mode-indicator"></div>
+      <button type="button" class="mode-btn active" id="mode-chat" data-oculo="setViewMode:chat" aria-pressed="true" aria-controls="messages">
+        <span class="mode-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        Chat
+      </button>
+      <button type="button" class="mode-btn" id="mode-control" data-oculo="setViewMode:control" aria-pressed="false" aria-controls="cu-dock">
+        <span class="mode-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+        Điều khiển
+      </button>
+    </div>
+
+    <!-- Primary labeled actions — chỉ giữ Skills badge, còn lại vào ... menu -->
+    <div id="skill-active-badge" class="skill-active-badge is-hidden" data-oculo="openSkills"></div>
+
+    <!-- Automation panel toggle button -->
+    <button type="button" class="hbtn auto-panel-btn" id="auto-panel-btn" data-oculo="toggleAutoPanel" title="Tự động hóa" aria-label="Mở bảng tự động hóa" aria-expanded="false" aria-controls="auto-panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+
+    <!-- Overflow "..." menu — chỉ giữ 5 items thường dùng -->
+    <div class="hmore-wrap" id="hmore-wrap">
+      <button type="button" class="hmore-btn" id="hmore-btn" data-oculo="toggleMoreMenu" title="Thêm tùy chọn" aria-label="Menu thêm tùy chọn" aria-expanded="false" aria-haspopup="true" aria-controls="hmore-menu">
+        <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg>
+      </button>
+      <div class="hmore-menu" id="hmore-menu" role="menu" aria-label="Thêm tùy chọn">
+        <button type="button" class="hmore-item" role="menuitem" data-oculo="toggleThemeUI|toggleMoreMenu" aria-label="Đổi chế độ sáng hoặc tối">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span id="theme-menu-label">Giao diện sáng</span>
+        </button>
+        <button type="button" class="hmore-item" role="menuitem" data-oculo="openSettings|toggleMoreMenu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Cấu hình
+        </button>
+        <button type="button" class="hmore-item" role="menuitem" data-oculo="openMemory|toggleMoreMenu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Bộ nhớ
+        </button>
+        <button type="button" class="hmore-item" role="menuitem" data-oculo="openShortcuts|toggleMoreMenu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="14" y2="12"/><line x1="6" y1="16" x2="10" y2="16"/><line x1="14" y1="16" x2="14" y2="16"/></svg>
+          Phím tắt
+        </button>
+        <div class="hmore-sep" role="separator" aria-hidden="true"></div>
+        <button type="button" class="hmore-item danger" role="menuitem" id="clear-btn" aria-label="Xóa toàn bộ lịch sử chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          Xóa chat
+        </button>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+
+<aside id="cu-dock" aria-label="Điều khiển máy tính trực tiếp">
+
+  <!-- ── Resize handle ── -->
+  <div class="cu-resize-handle" id="cu-resize-handle" aria-hidden="true"></div>
+
+  <!-- ── Header ── -->
+  <div class="cu-dock-head">
+    <div class="cu-head-left">
+      <div class="cu-status-ring" id="cu-status-ring" aria-hidden="true">
+        <div class="cu-sdot" id="cu-sdot"></div>
+      </div>
+      <div class="cu-head-info">
+        <span class="cu-head-title">Điều khiển</span>
+        <span class="cu-vision-badge">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Vision AI
+        </span>
+      </div>
+    </div>
+    <div class="cu-head-center">
+      <span class="cu-head-status" id="cu-status-text">Sẵn sàng</span>
+      <span class="cu-elapsed" id="cu-elapsed" hidden>0s</span>
+    </div>
+    <div class="cu-head-btns">
+      <button type="button" class="cu-icon-btn" id="cu-fullscreen-btn" title="Phóng to màn hình" aria-label="Phóng to màn hình">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button type="button" class="cu-icon-btn" data-oculo="setViewMode:chat" title="Quay lại Chat · ⌘1" aria-label="Đóng chế độ điều khiển">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Progress bar ── -->
+  <div class="cu-progress-wrap"><div class="cu-progress-bar" id="cu-progress"></div></div>
+
+  <!-- ── Zone 1: Live Screen ── -->
+  <div class="cu-screen-zone">
+    <div class="cu-screen-wrap empty" id="cu-screen-wrap" data-oculo="cuOpenLightbox" role="button" tabindex="0" aria-label="Màn hình live, click để phóng to">
+      <!-- Scan-line overlay khi đang chạy -->
+      <div class="cu-scan-overlay" id="cu-scan-overlay" aria-hidden="true"></div>
+      <div class="cu-screen-placeholder" id="cu-screen-placeholder">
+        <div class="cu-screen-placeholder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <span class="cu-screen-placeholder-text">Màn hình live</span>
+        <span class="cu-screen-placeholder-hint">Hiện khi agent chụp màn hình</span>
+      </div>
+      <img id="cu-screenshot" alt="Live screen">
+      <!-- Step counter overlay -->
+      <div class="cu-screen-step" id="cu-screen-step" hidden>
+        <span class="cu-screen-step-num" id="cu-screen-step-num">0</span>
+        <span class="cu-screen-step-label">bước</span>
+      </div>
+      <div class="cu-screen-overlay" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        Phóng to
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Zone 2: Input ── -->
+  <div class="cu-input-zone">
+    <div class="cu-quick-chips" id="cu-quick-chips">
+      <button class="cu-chip" data-oculo="cuSuggest" data-oculo-prompt="%27Ch%E1%BB%A5p%20m%C3%A0n%20h%C3%ACnh%20v%C3%A0%20m%C3%B4%20t%E1%BA%A3%20%C4%91ang%20hi%E1%BB%83n%20th%E1%BB%8B%20g%C3%AC%27">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Chụp màn hình
+      </button>
+      <button class="cu-chip" data-oculo="cuSuggest" data-oculo-prompt="%27M%E1%BB%9F%20Terminal%27">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        Terminal
+      </button>
+      <button class="cu-chip" data-oculo="cuSuggest" data-oculo-prompt="%27M%E1%BB%9F%20Safari%20v%C3%A0%20v%C3%A0o%20google.com%27">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Safari
+      </button>
+      <button class="cu-chip" data-oculo="cuSuggest" data-oculo-prompt="%27Ki%E1%BB%83m%20tra%20RAM%20v%C3%A0%20CPU%20%C4%91ang%20d%C3%B9ng%20bao%20nhi%C3%AAu%27">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        RAM/CPU
+      </button>
+    </div>
+    <div class="cu-textarea-wrap">
+      <textarea id="cu-task" rows="2" placeholder="Mô tả việc cần làm… vd: Mở Safari, vào google.com, tìm 'tin tức AI'" autocomplete="off" spellcheck="false"></textarea>
+      <span class="cu-char-count" id="cu-char-count"></span>
+    </div>
+    <div class="cu-btn-row">
+      <button id="cu-run-btn" data-oculo="runComputerUse" aria-label="Bắt đầu điều khiển">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Bắt đầu
+      </button>
+      <button id="cu-abort-btn" data-oculo="abortComputerUse" aria-label="Dừng agent">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        Dừng
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Zone 3: Activity Log ── -->
+  <div class="cu-log-zone">
+    <div class="cu-log-head">
+      <span class="cu-log-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Nhật ký
+        <span class="cu-log-badge" id="cu-step-badge" hidden>0</span>
+      </span>
+      <button class="cu-log-clear" data-oculo="clearCuLog" aria-label="Xóa nhật ký">Xóa</button>
+    </div>
+    <div class="cu-log" id="cu-log" role="log" aria-live="polite">
+      <div class="cu-empty-state" id="cu-log-empty">
+        <div class="cu-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="cu-empty-title">Chưa có thao tác nào</div>
+        <div class="cu-empty-sub">Nhập yêu cầu và nhấn Bắt đầu</div>
+      </div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- Screenshot lightbox -->
+<div id="cu-lightbox" data-oculo="cuCloseLightbox">
+  <img id="cu-lightbox-img" alt="Screenshot fullsize">
+</div>
+
+<!-- Context window meter -->
+<div id="ctx-meter">
+  <div class="ctx-bar"><div class="ctx-fill" id="ctx-fill"></div></div>
+  <div class="ctx-info">
+    <span class="ctx-pct" id="ctx-pct">0%</span>
+    <span>context</span>
+    <span id="ctx-tokens" class="ctx-tokens-muted"></span>
+  </div>
+</div>
+
+<div id="messages" role="log" aria-live="polite" aria-relevant="additions">
+</div>
+
+<div id="file-preview"></div>
+
+<div id="input-area">
+  <div id="agent-status-line" class="agent-status-line" hidden></div>
+  <div class="iwrap" id="iwrap">
+    <div class="ibtns">
+      <button type="button" class="ibtn" id="voice-btn" title="Nhập bằng giọng nói" data-oculo="toggleVoice" aria-label="Nhập bằng giọng nói">
+        <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <button type="button" class="ibtn" id="file-btn" title="Đính kèm file hoặc ảnh" data-oculo="openFilePicker" aria-label="Đính kèm file hoặc ảnh">
+        <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <input type="file" id="file-input" multiple accept="image/*,.txt,.md,.py,.js,.json,.csv" style="display:none">
+    </div>
+    <textarea id="user-input" rows="1" placeholder="Giao việc cho Oculo... (nhấn / để focus)"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+    <button type="button" id="pause-btn" title="Tạm dừng xử lý phía trình duyệt (hàng đợi sự kiện; không hủy yêu cầu trên server)" data-oculo="togglePause" aria-label="Tạm dừng hoặc tiếp tục nhận sự kiện SSE">
+      <svg id="pause-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+    <button type="button" id="abort-btn" title="Dừng agent" data-oculo="abortStream" aria-label="Dừng agent">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+    </button>
+    <button type="button" id="send-btn" aria-label="Gửi tin nhắn">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2" fill="#fff" stroke="none"/></svg>
+    </button>
+  </div>
+  <div class="hint">Enter gửi · Shift+Enter xuống dòng · / focus ô chat · <span class="hint-k" title="Xóa toàn bộ nội dung chat (có xác nhận)">⌘K</span> xóa · ⌘N mới · <span class="hint-k" title="Mở danh sách phím tắt">⌥/</span> phím tắt</div>
+</div>
+
+<!-- Todo Panel - Cursor style -->
+<div id="todo-panel">
+  <div class="todo-head">
+    <div class="todo-head-left">
+      <div class="todo-head-icon">
+        <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <span class="todo-head-title">Kế hoạch</span>
+      <span class="todo-head-count" id="todo-count"></span>
+    </div>
+    <button class="todo-head-close" data-oculo="hideTodoPanel" title="Ẩn">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="todo-body" id="todo-body"></div>
+</div>
+
+<button type="button" id="scroll-btn" data-oculo="scrollToChatBottom" aria-label="Cuộn xuống tin nhắn mới nhất">
+  <span id="new-msg-badge"></span>
+  <div class="scroll-arrow">
+    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+</button>
+
+<!-- Search bar -->
+<div id="search-bar">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <input id="search-input" placeholder="Tìm trong lịch sử chat..." autocomplete="off">
+  <span class="search-count" id="search-count"></span>
+  <div class="search-nav">
+    <button data-oculo="searchNav:-1" title="Trước"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></button>
+    <button data-oculo="searchNav:1" title="Sau"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+  </div>
+  <button class="search-close" data-oculo="closeSearch"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+</div>
+
+<aside id="activity-sidebar" class="activity-sidebar" aria-label="Hoạt động nền" aria-hidden="true">
+  <div class="activity-sidebar-inner">
+    <div class="activity-sidebar-head">
+      <span class="activity-sidebar-title">Hoạt động</span>
+      <button type="button" class="activity-sidebar-close" data-oculo="toggleActivitySidebar" title="Đóng" aria-label="Đóng bảng hoạt động">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="activity-sidebar-body">
+      <section class="as-section" aria-labelledby="as-label-streams">
+        <div class="as-section-head">
+          <span id="as-label-streams" class="as-section-label">Streams đang chạy</span>
+          <span id="as-count-streams" class="as-section-count">0</span>
+        </div>
+        <div id="as-list-streams" class="as-list"></div>
+      </section>
+      <section class="as-section" aria-labelledby="as-label-monitors">
+        <div class="as-section-head">
+          <span id="as-label-monitors" class="as-section-label">Monitors</span>
+          <span id="as-count-monitors" class="as-section-count">0</span>
+        </div>
+        <div id="as-list-monitors" class="as-list"></div>
+      </section>
+      <section class="as-section" id="as-section-schedules" aria-labelledby="as-label-sched">
+        <div class="as-section-head">
+          <span id="as-label-sched" class="as-section-label">Lịch đã đặt</span>
+          <span id="as-count-schedules" class="as-section-count">0</span>
+        </div>
+        <div id="as-list-schedules" class="as-list"></div>
+      </section>
+    </div>
+    <div class="activity-sidebar-foot">
+      <span id="as-last-update" class="as-last-update">Cập nhật lúc —:—</span>
+      <button type="button" class="as-refresh btn btn-ghost btn--compact" id="as-refresh" data-oculo="activitySidebarRefresh">Refresh</button>
+    </div>
+  </div>
+</aside>
+
+<!-- Automation Panel — drawer từ phải -->
+<div id="auto-panel-backdrop" class="auto-panel-backdrop" data-oculo="closeAutoPanel" aria-hidden="true"></div>
+<aside id="auto-panel" class="auto-panel" aria-label="Tự động hóa" aria-hidden="true">
+  <div class="auto-panel-inner">
+    <div class="auto-panel-head">
+      <span class="auto-panel-title">Tự động hóa</span>
+      <button type="button" class="auto-panel-close" data-oculo="closeAutoPanel" title="Đóng" aria-label="Đóng bảng tự động hóa">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="auto-panel-body">
+
+      <!-- Kỹ năng -->
+      <div class="ap-section">
+        <div class="ap-section-label">Agent</div>
+        <button type="button" class="ap-item" data-oculo="openSkills|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Kỹ năng</span>
+            <span class="ap-item-desc">Chọn chuyên môn cho agent</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="ap-item" data-oculo="openCheckpoints|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Checkpoint</span>
+            <span class="ap-item-desc">Khôi phục trạng thái hội thoại</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="ap-item" data-oculo="openPipeline|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Pipeline đa agent</span>
+            <span class="ap-item-desc">Nghiên cứu → Thực thi → Đánh giá</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Giám sát & lịch -->
+      <div class="ap-section">
+        <div class="ap-section-label">Giám sát &amp; lịch</div>
+        <button type="button" class="ap-item" data-oculo="openMonitor|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Giám sát chủ động</span>
+            <span class="ap-item-desc">Theo dõi file, lịch, hệ thống</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="ap-item" data-oculo="openSchedules|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Lịch đã đặt</span>
+            <span class="ap-item-desc">Tác vụ chạy theo lịch</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <!-- Xuất dữ liệu -->
+      <div class="ap-section">
+        <div class="ap-section-label">Xuất dữ liệu</div>
+        <button type="button" class="ap-item" data-oculo="exportChat|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Xuất hội thoại</span>
+            <span class="ap-item-desc">Lưu dưới dạng JSON</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="ap-item" data-oculo="exportPDF|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Xuất PDF</span>
+            <span class="ap-item-desc">In hoặc lưu PDF</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="ap-item" data-oculo="copyConversation|closeAutoPanel">
+          <span class="ap-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </span>
+          <span class="ap-item-text">
+            <span class="ap-item-name">Sao chép hội thoại</span>
+            <span class="ap-item-desc">Copy toàn bộ nội dung</span>
+          </span>
+          <svg class="ap-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</aside>
+
+<!-- Drag & drop overlay -->
+<div id="drop-overlay">
+  <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+  <div class="drop-title">Thả file vào đây</div>
+  <div class="drop-sub">Hỗ trợ ảnh, .txt, .md, .py, .js, .json, .csv</div>
+</div>
+
+<!-- Browser Live View Panel -->
+<div id="browser-live-panel" class="browser-live-panel" hidden aria-label="Trình duyệt đang điều khiển">
+  <div class="blp-header">
+    <div class="blp-indicator">
+      <span class="blp-dot"></span>
+      <span class="blp-label">Đang điều khiển</span>
+    </div>
+    <div class="blp-url" id="blp-url" title="">about:blank</div>
+    <div class="blp-actions">
+      <button type="button" class="blp-btn" id="blp-expand-btn" title="Phóng to" aria-label="Phóng to">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button type="button" class="blp-btn blp-close-btn" id="blp-close-btn" title="Ẩn" aria-label="Ẩn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="blp-screen-wrap" id="blp-screen-wrap">
+    <div class="blp-placeholder" id="blp-placeholder">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span>Chờ browser...</span>
+    </div>
+    <img id="blp-screen" class="blp-screen" alt="Browser live view" hidden>
+  </div>
+  <div class="blp-footer">
+    <span class="blp-step" id="blp-step">Khởi động...</span>
+    <span class="blp-ts" id="blp-ts"></span>
+  </div>
+</div>
+
+<!-- Browser Live Lightbox -->
+<div id="blp-lightbox" class="blp-lightbox" hidden>
+  <div class="blp-lightbox-inner">
+    <div class="blp-lightbox-bar">
+      <span class="blp-indicator"><span class="blp-dot"></span><span class="blp-label">Đang điều khiển</span></span>
+      <span class="blp-lightbox-url" id="blp-lightbox-url"></span>
+      <button type="button" class="blp-btn" id="blp-lightbox-close" aria-label="Đóng">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <img id="blp-lightbox-img" class="blp-lightbox-img" alt="Browser fullscreen">
+  </div>
+</div>
+
+</body>
+</html>
