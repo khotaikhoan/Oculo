@@ -27,17 +27,32 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Create venv & install deps
+      - name: Install dependencies
         working-directory: ai-agent
         run: |
           python3 -m venv venv
-          ./venv/bin/pip install -q --upgrade pip
-          ./venv/bin/pip install -q -r requirements.txt
-          ./venv/bin/pip install -q pyinstaller
+          ./venv/bin/pip install --upgrade pip
+
+          # Install torch CPU-only first (~250MB vs ~700MB GPU version)
+          ./venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+          # Install remaining deps (torch already installed above, won't re-download)
+          ./venv/bin/pip install -r requirements.txt
+
+          # Install playwright browsers (needed for bundling)
+          ./venv/bin/playwright install chromium
+
+          ./venv/bin/pip install pyinstaller
+
+      - name: Check disk space
+        run: df -h /
 
       - name: Build Oculo.app
         working-directory: ai-agent
         run: bash build/macos/build_app.sh
+
+      - name: Check dist size
+        run: du -sh ai-agent/dist/Oculo.app 2>/dev/null || echo "No .app found"
 
       - name: Create DMG
         working-directory: ai-agent
