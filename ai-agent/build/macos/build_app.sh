@@ -40,7 +40,7 @@ echo "Building $APP_NAME.app (bundle id: $BUNDLE_ID)..."
   --osx-bundle-identifier "$BUNDLE_ID" \
   --add-data "static:static" \
   --add-data "Oculo.icns:." \
-  "${ADD_DATA_ENV[@]}" \
+  "${ADD_DATA_ENV[@]+"${ADD_DATA_ENV[@]}"}" \
   --collect-submodules chromadb \
   --collect-submodules sentence_transformers \
   --collect-submodules webview \
