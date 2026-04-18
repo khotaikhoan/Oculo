@@ -64,9 +64,15 @@ from utils.openai_bridge import (
     usage_from_openai,
 )
 
-load_dotenv()
+from utils.app_paths import resource_dir as _resource_dir, dotenv_path as _dotenv_path
 
-app = Flask(__name__, static_folder="static")
+load_dotenv(_dotenv_path())
+
+# Dùng đường dẫn tuyệt đối tới static/ — khi chạy trong .app (PyInstaller)
+# thư mục hiện tại là "/" và static_folder relative sẽ không tìm thấy file.
+_STATIC_DIR = str(_resource_dir() / "static")
+
+app = Flask(__name__, static_folder=_STATIC_DIR)
 
 
 def _tool_use_id_str(tid) -> str:
@@ -1866,11 +1872,11 @@ def _fallback_non_ollama_model() -> str:
 
 @app.route("/")
 def index():
-    return send_from_directory("static", "index.html")
+    return send_from_directory(_STATIC_DIR, "index.html")
 
 @app.route("/static/sw.js")
 def service_worker():
-    resp = send_from_directory("static", "sw.js")
+    resp = send_from_directory(_STATIC_DIR, "sw.js")
     resp.headers["Service-Worker-Allowed"] = "/"
     resp.headers["Cache-Control"] = "no-cache"
     return resp

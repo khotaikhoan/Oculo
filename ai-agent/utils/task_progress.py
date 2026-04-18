@@ -10,7 +10,9 @@ from pathlib import Path
 from dataclasses import dataclass, asdict, field
 from typing import List, Optional, Any
 
-DB_PATH = Path(__file__).parent.parent / "data" / "task_progress.db"
+from utils.app_paths import data_dir
+
+DB_PATH = data_dir("data") / "task_progress.db"
 
 
 @dataclass
