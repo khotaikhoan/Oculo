@@ -1,30 +1,61 @@
 """
 Long-term memory using ChromaDB + sentence-transformers embeddings.
-Stores facts, summaries, and past interactions across sessions.
+
+All heavy objects (_ef, _client, collections) are lazy-initialized on first
+use so that importing this module never crashes the server — even when
+sentence_transformers or transformers has bundling issues in a frozen app.
 """
 import os
 import sys
 import json
-import chromadb
 from datetime import datetime
-from chromadb.utils import embedding_functions
 
-# Ghi ChromaDB ra thư mục user-writable khi app chạy từ .app bundle (read-only).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.app_paths import data_dir  # noqa: E402
 
 DB_PATH = str(data_dir("chroma_db"))
 
-# Use local sentence-transformers (no API key needed)
-_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name="all-MiniLM-L6-v2"
-)
+# ── Lazy singletons — initialized on first access ──
+_ef = None
+_client = None
+_memories = None
+_summaries = None
 
-_client = chromadb.PersistentClient(path=DB_PATH)
 
-# Collections
-_memories  = _client.get_or_create_collection("memories",  embedding_function=_ef)
-_summaries = _client.get_or_create_collection("summaries", embedding_function=_ef)
+def _get_ef():
+    global _ef
+    if _ef is None:
+        from chromadb.utils import embedding_functions
+        _ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    return _ef
+
+
+def _get_client():
+    global _client
+    if _client is None:
+        import chromadb
+        _client = chromadb.PersistentClient(path=DB_PATH)
+    return _client
+
+
+def _get_memories():
+    global _memories
+    if _memories is None:
+        _memories = _get_client().get_or_create_collection(
+            "memories", embedding_function=_get_ef()
+        )
+    return _memories
+
+
+def _get_summaries():
+    global _summaries
+    if _summaries is None:
+        _summaries = _get_client().get_or_create_collection(
+            "summaries", embedding_function=_get_ef()
+        )
+    return _summaries
 
 
 def save_memory(content: str, metadata: dict = None):
@@ -33,14 +64,14 @@ def save_memory(content: str, metadata: dict = None):
     meta = {"timestamp": datetime.now().isoformat(), "type": "memory"}
     if metadata:
         meta.update(metadata)
-    _memories.add(documents=[content], ids=[doc_id], metadatas=[meta])
+    _get_memories().add(documents=[content], ids=[doc_id], metadatas=[meta])
     return doc_id
 
 
 def save_session_summary(session_id: str, summary: str, key_facts: list[str]):
     """Save a summary of a chat session."""
     doc_id = f"sess_{session_id}"
-    _summaries.add(
+    _get_summaries().add(
         documents=[summary],
         ids=[doc_id],
         metadatas=[{
@@ -54,7 +85,7 @@ def save_session_summary(session_id: str, summary: str, key_facts: list[str]):
 def search_memory(query: str, n_results: int = 5) -> list[dict]:
     """Search long-term memory for relevant information."""
     results = []
-    for collection in [_memories, _summaries]:
+    for collection in [_get_memories(), _get_summaries()]:
         try:
             count = collection.count()
             if count == 0:
@@ -73,13 +104,12 @@ def search_memory(query: str, n_results: int = 5) -> list[dict]:
                 })
         except Exception:
             pass
-    # Sort by relevance (lower distance = more relevant)
     results.sort(key=lambda x: x.get("distance", 1.0))
     return results[:n_results]
 
 
 def get_memory_context(query: str) -> str:
-    """Get formatted memory context — legacy, returns all results."""
+    """Get formatted memory context for prompt injection."""
     memories = search_memory(query, n_results=4)
     if not memories:
         return ""
@@ -98,24 +128,20 @@ def search_memory_with_scores(query: str, n_results: int = 6) -> list[dict]:
 def list_memories(limit: int = 20) -> list[dict]:
     """List recent memories, sorted by timestamp descending."""
     try:
-        r = _memories.get(include=["documents", "metadatas", "ids"])
+        r = _get_memories().get(include=["documents", "metadatas", "ids"])
         items = [
             {"id": r["ids"][i], "content": r["documents"][i], "metadata": r["metadatas"][i]}
             for i in range(len(r["documents"]))
         ]
-        # Sort by timestamp descending (newest first)
-        items.sort(
-            key=lambda x: x["metadata"].get("timestamp", ""),
-            reverse=True,
-        )
+        items.sort(key=lambda x: x["metadata"].get("timestamp", ""), reverse=True)
         return items[:limit]
     except Exception:
         return []
 
 
 def delete_memory(doc_id: str):
-    """Delete a specific memory (memories hoặc summaries — tìm đúng collection)."""
-    for coll in (_memories, _summaries):
+    """Delete a specific memory from either collection."""
+    for coll in (_get_memories(), _get_summaries()):
         try:
             coll.delete(ids=[doc_id])
         except Exception:
@@ -124,17 +150,17 @@ def delete_memory(doc_id: str):
 
 def clear_all_memories():
     """Clear all memories (use with caution)."""
-    _client.delete_collection("memories")
-    _client.delete_collection("summaries")
     global _memories, _summaries
-    _memories  = _client.get_or_create_collection("memories",  embedding_function=_ef)
-    _summaries = _client.get_or_create_collection("summaries", embedding_function=_ef)
+    client = _get_client()
+    client.delete_collection("memories")
+    client.delete_collection("summaries")
+    _memories = None
+    _summaries = None
 
 
 def consolidate_old_memories(anthropic_client) -> dict:
     """
     Tóm tắt session memories cũ hơn 30 phút thành facts ngắn gọn bằng Haiku.
-    Requirements: 5.1 - 5.6
     """
     import time
     from datetime import datetime, timedelta
@@ -142,7 +168,7 @@ def consolidate_old_memories(anthropic_client) -> dict:
     cutoff = (datetime.now() - timedelta(minutes=30)).isoformat()
 
     try:
-        all_mems = _memories.get(include=["documents", "metadatas", "ids"])
+        all_mems = _get_memories().get(include=["documents", "metadatas", "ids"])
     except Exception as e:
         return {"consolidated": 0, "reason": f"fetch failed: {e}"}
 
@@ -156,7 +182,7 @@ def consolidate_old_memories(anthropic_client) -> dict:
     if len(old_docs) < 5:
         return {"consolidated": 0, "reason": "not enough old session memories"}
 
-    combined = "\n".join(old_docs[:20])  # Giới hạn để tránh token quá lớn
+    combined = "\n".join(old_docs[:20])
     try:
         user_msg = (
             f"Tóm tắt các memories sau thành tối đa 3 facts ngắn gọn "
@@ -175,13 +201,11 @@ def consolidate_old_memories(anthropic_client) -> dict:
     except Exception as e:
         return {"consolidated": 0, "reason": f"haiku api failed: {e}"}
 
-    # Lưu facts mới
     for fact in facts:
         save_memory(fact, {"category": "consolidated_fact"})
 
-    # Xóa memories cũ
     try:
-        _memories.delete(ids=old_ids)
+        _get_memories().delete(ids=old_ids)
     except Exception:
         pass
 
