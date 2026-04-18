@@ -23,18 +23,22 @@ const ICON_MOON  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" 
 // ── Welcome screen HTML — dùng chung ở mọi nơi ──
 const EYE_AVATAR_HTML = `<div class="agent-eye-avatar" aria-hidden="true"><span class="agent-eye agent-eye--l"><span class="agent-eye-sclera"><span class="agent-eye-track"><span class="agent-eye-iris"><span class="agent-eye-pupil"></span></span></span></span></span><span class="agent-eye agent-eye--r"><span class="agent-eye-sclera"><span class="agent-eye-track"><span class="agent-eye-iris"><span class="agent-eye-pupil"></span></span></span></span></span></div>`;
 
-// #12 — Pool chips để shuffle mỗi lần load
+// Pool chips — shuffled each load
 const ALL_CHIPS = [
-  {label:'Thời tiết Hà Nội', q:'Thời tiết Hà Nội hôm nay?', icon:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>'},
-  {label:'File trong Desktop', q:'Liệt kê file trong Desktop', icon:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'},
-  {label:'RAM & CPU', q:'RAM và CPU đang dùng bao nhiêu?', icon:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'},
-  {label:'Phân tích màn hình', q:'Chụp màn hình và mô tả đang làm gì', icon:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'},
-  {label:'Mở Safari', q:'Mở Safari và vào google.com', icon:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'},
-  {label:'Tạo file', q:'Tạo file notes.txt trên Desktop', icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'},
-  {label:'Tìm kiếm web', q:'Tìm kiếm tin tức AI mới nhất hôm nay', icon:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'},
-  {label:'Kiểm tra disk', q:'Dung lượng ổ đĩa còn bao nhiêu?', icon:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'},
-  {label:'Viết code Python', q:'Viết hàm Python đọc file CSV và tính tổng cột số', icon:'<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'},
-  {label:'Đặt nhắc nhở', q:'Nhắc tôi uống nước sau 30 phút', icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'},
+  {label:'Thời tiết hôm nay', q:'Thời tiết Hà Nội hôm nay và tuần này?', icon:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>'},
+  {label:'File trong Desktop', q:'Liệt kê và mô tả các file trong Desktop của tôi', icon:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'},
+  {label:'RAM & CPU', q:'RAM và CPU đang dùng bao nhiêu? Tiến trình nào ngốn nhiều nhất?', icon:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'},
+  {label:'Phân tích màn hình', q:'Chụp màn hình và mô tả chi tiết tôi đang làm gì', icon:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'},
+  {label:'Tóm tắt clipboard', q:'Tóm tắt nội dung đang có trong clipboard của tôi', icon:'<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>'},
+  {label:'Tạo file ghi chú', q:'Tạo file notes.md trên Desktop với tiêu đề và ngày hôm nay', icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'},
+  {label:'Tin tức AI mới nhất', q:'Tìm kiếm và tóm tắt 3 tin tức AI nổi bật nhất hôm nay', icon:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'},
+  {label:'Dung lượng ổ đĩa', q:'Dung lượng ổ đĩa còn bao nhiêu? Thư mục nào chiếm nhiều nhất?', icon:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'},
+  {label:'Viết script Python', q:'Viết script Python đọc file CSV, tính tổng và trung bình các cột số, xuất kết quả ra file mới', icon:'<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'},
+  {label:'Nhắc nhở uống nước', q:'Nhắc tôi uống nước mỗi 30 phút trong 3 giờ tới', icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'},
+  {label:'Dọn file tải về', q:'Liệt kê các file cũ hơn 30 ngày trong thư mục Downloads và hỏi tôi có muốn xóa không', icon:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>'},
+  {label:'Mở ứng dụng', q:'Mở Safari và vào trang tin tức vnexpress.net', icon:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'},
+  {label:'Viết email chuyên nghiệp', q:'Viết một email chuyên nghiệp xin lỗi khách hàng vì chậm giao hàng và đề xuất giải pháp', icon:'<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'},
+  {label:'Git status dự án', q:'Kiểm tra git status của dự án hiện tại trên Desktop', icon:'<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>'},
 ];
 
 function _shuffleChips(){
@@ -102,10 +106,16 @@ function buildWelcomeHTML(){
     `<div class="chip" style="animation-delay:${i*0.05}s" data-oculo="suggest" data-oculo-prompt="${encodeURIComponent(c.q)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${c.icon}</svg>${c.label}</div>`
   ).join('');
 
+  const onboardBanner = _hasApiKey ? '' : `<div class="onboard-notice">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>Chưa có API key. Tạo file <code>~/Library/Application Support/Oculo/.env</code> với dòng <code>ANTHROPIC_API_KEY=sk-…</code> rồi khởi động lại app.</span>
+  </div>`;
+
   return `<div id="welcome">
     <div class="wicon" id="welcome-icon">${EYE_AVATAR_HTML}</div>
     <h2>Oculo</h2>
     <p class="welcome-slogan">Nhìn thấu · Hiểu sâu · Làm được mọi việc bạn cần.</p>
+    ${onboardBanner}
     <div class="cap-pills">${capHtml}</div>
     <div class="chips">${chipsHtml}</div>
   </div>`;
@@ -199,6 +209,7 @@ let _excludeModelIds = new Set();
 let _appVersion = '';
 let _downloadsUrl = '';
 let _updateFeedUrl = '';
+let _hasApiKey = true; // optimistic default; updated after fetchClientConfig
 
 async function fetchClientConfig(){
   try{
@@ -212,6 +223,7 @@ async function fetchClientConfig(){
     if(typeof j.app_version === 'string') _appVersion = j.app_version.trim();
     if(typeof j.downloads_url === 'string') _downloadsUrl = j.downloads_url.trim();
     if(typeof j.update_feed_url === 'string') _updateFeedUrl = j.update_feed_url.trim();
+    if(typeof j.has_api_key === 'boolean') _hasApiKey = j.has_api_key;
   }catch(e){}
 }
 
@@ -3654,6 +3666,10 @@ async function send(){
   }
   // Blur sau khi chắc chắn sẽ gửi — tránh mất focus khi gõ Enter lúc đang busy / ô trống
   inputEl.blur();
+  // Fade hint bar after 3 successful sends
+  const _sc = (parseInt(localStorage.getItem('oculo_send_count')||'0',10)||0)+1;
+  localStorage.setItem('oculo_send_count', _sc);
+  if(_sc >= 3){ const _h=document.querySelector('.hint'); if(_h) _h.classList.add('hint-faded'); }
   localStorage.removeItem('chat_draft');
   _suppressDraft = true;
   inputEl.value='';
@@ -4644,14 +4660,14 @@ let _modalPrevFocus = null;
 function closeModal(id){
   const el = document.getElementById(id);
   if(!el) return;
-  el.classList.remove('open');
   if(id==='confirm-modal') _confirmAction = null;
-  // Restore focus trap
   if(_modalFocusTrapHandler){
     document.removeEventListener('keydown', _modalFocusTrapHandler);
     _modalFocusTrapHandler = null;
   }
   if(_modalPrevFocus){ _modalPrevFocus.focus(); _modalPrevFocus = null; }
+  el.classList.add('closing');
+  setTimeout(()=>{ el.classList.remove('open','closing'); }, 160);
 }
 
 function _trapFocus(modalEl){
@@ -6182,10 +6198,19 @@ setViewMode(currentViewMode);
 updateSidebarLayout();
 initHeaderHeightSync();
 fetchClientConfig()
-  .then(() => { migrateModelIfExcluded(); return loadModelCatalog(); })
+  .then(() => {
+    migrateModelIfExcluded();
+    // Re-render welcome screen so onboard-notice reflects actual API key status
+    if(!_hasApiKey){ const _w=document.getElementById('welcome'); if(_w&&_w.closest('.mwrap')){ const _mw=_w.closest('.mwrap'); _mw.innerHTML=buildWelcomeHTML(); _initChipKeyNav(); } }
+    return loadModelCatalog();
+  })
   .then(() => { enforceOllamaPolicy(); updateHeaderModelDisplay(); })
   .then(() => _checkForUpdateOnce())
   .catch(() => updateHeaderModelDisplay());
+// Apply hint-faded on load if user has already sent 3+ messages
+if((parseInt(localStorage.getItem('oculo_send_count')||'0',10)||0) >= 3){
+  const _hEl=document.querySelector('.hint'); if(_hEl) _hEl.classList.add('hint-faded');
+}
 ActivitySidebar.init();
 // Init mode indicator — no animation on first render
 requestAnimationFrame(()=>requestAnimationFrame(()=>updateModeIndicator(false)));

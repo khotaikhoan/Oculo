@@ -2159,6 +2159,7 @@ def client_config():
             # Optional: where client can check for updates (JSON feed or GitHub API proxy).
             "update_feed_url": (os.getenv("OCULO_UPDATE_FEED_URL") or "").strip(),
             "downloads_url": (os.getenv("OCULO_DOWNLOADS_URL") or "").strip(),
+            "has_api_key": bool(key_manager.keys),
         }
     )
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
