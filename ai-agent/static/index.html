@@ -38,6 +38,7 @@
 <!-- Sidebar (multi-conversation) -->
 <div id="sidebar-backdrop" class="sidebar-backdrop" data-oculo="closeSidebar" aria-hidden="true"></div>
 <aside id="sidebar" aria-label="Danh sách hội thoại">
+  <div class="sidebar-resize-handle" id="sidebar-resize-handle" aria-hidden="true"></div>
   <div class="sidebar-head">
     <span class="sidebar-title">Hội thoại</span>
     <button type="button" class="sidebar-new-btn" data-oculo="newConversation" title="Tạo mới (Ctrl+N)" aria-label="Tạo hội thoại mới">
@@ -342,6 +343,11 @@
     <button type="button" class="hbtn auto-panel-btn" id="auto-panel-btn" data-oculo="toggleAutoPanel" title="Tự động hóa — kỹ năng, pipeline, giám sát, lịch" aria-label="Mở bảng tự động hóa" aria-expanded="false" aria-controls="auto-panel">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       <span class="auto-panel-btn-label">Tự động</span>
+    </button>
+
+    <!-- Density toggle -->
+    <button type="button" class="density-btn" id="density-btn" data-oculo="toggleDensity" title="Chế độ compact" aria-label="Đổi mật độ tin nhắn">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
     </button>
 
     <!-- Overflow "..." menu — chỉ giữ 5 items thường dùng -->

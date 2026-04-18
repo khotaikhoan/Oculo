@@ -179,6 +179,28 @@ function toggleThemeUI(){
   setTimeout(()=>document.body.classList.remove('theme-switching'), 400);
 }
 
+// ── Density mode: comfortable (default) / compact ──
+function toggleDensity(){
+  const compact = document.body.classList.toggle('density-compact');
+  localStorage.setItem('oculo_density', compact ? 'compact' : 'comfortable');
+}
+// Apply saved density on load
+if(localStorage.getItem('oculo_density') === 'compact') document.body.classList.add('density-compact');
+
+// ── Time-based accent color ──
+(function _applyTimeAccent(){
+  const h = new Date().getHours();
+  let accent, accent2;
+  if(h >= 6 && h < 12){ accent='#3b82f6'; accent2='#60a5fa'; }       // Morning — blue
+  else if(h >= 12 && h < 17){ accent='#6366f1'; accent2='#818cf8'; } // Afternoon — indigo
+  else if(h >= 17 && h < 21){ accent='#7c3aed'; accent2='#a78bfa'; } // Evening — violet
+  else { accent='#1d4ed8'; accent2='#3b82f6'; }                       // Night — deep blue
+  if(theme === 'dark'){
+    document.documentElement.style.setProperty('--interactive-default', accent2);
+    document.documentElement.style.setProperty('--interactive-hover', accent === '#1d4ed8' ? '#60a5fa' : accent2.replace('fa','fd'));
+  }
+})()
+
 // Expose for data-oculo handlers / future UI buttons
 window.openDownloadsForUpdate = openDownloadsForUpdate;
 
@@ -893,7 +915,7 @@ function openFilePicker(){
 function notifyNewMsg(){
   if(shouldStickToBottom) return;
   newMsgCount++;
-  newMsgBadge.textContent = newMsgCount + ' tin mới';
+  newMsgBadge.textContent = newMsgCount > 9 ? '9+ ↓' : `${newMsgCount} ↓`;
   newMsgBadge.classList.add('visible');
   scrollBtn.classList.add('visible');
 }
@@ -1112,6 +1134,7 @@ function _applyMessageGrouping(newWrap, role){
 }
 
 function addUser(text, images){
+  _closeToolGroup();
   removeWelcome();const ts=nowTs();
   const imgs = Array.isArray(images) && images.length ? images : undefined;
   const w = renderUser(text, ts, true, imgs);
@@ -1457,7 +1480,7 @@ function addCopyBtns(container){
   container.querySelectorAll('pre').forEach(pre=>{
     if(pre.querySelector('.copy-btn'))return;
 
-    // Language label (mục 11)
+    // Language label + colored badge + line numbers
     const codeEl = pre.querySelector('code');
     if(codeEl){
       const langClass = Array.from(codeEl.classList).find(c=>c.startsWith('language-'));
@@ -1467,8 +1490,33 @@ function addCopyBtns(container){
           const label = document.createElement('span');
           label.className = 'code-lang-label';
           label.textContent = lang;
+          label.dataset.lang = lang.toLowerCase();
           pre.appendChild(label);
           pre.classList.add('has-lang');
+
+          // Line numbers for multi-line code blocks
+          const lines = codeEl.textContent.split('\n');
+          if(lines.length > 3){
+            const gutter = document.createElement('div');
+            gutter.className = 'line-num-gutter';
+            gutter.innerHTML = lines.slice(0, -1).map((_,i)=>`<span>${i+1}</span>`).join('');
+            pre.style.position = 'relative';
+            pre.classList.add('line-nums');
+            pre.prepend(gutter);
+          }
+
+          // Open in editor button (detect file paths in code)
+          const openBtn = document.createElement('button');
+          openBtn.type = 'button';
+          openBtn.className = 'code-open-btn';
+          openBtn.textContent = '⬡ Mở';
+          openBtn.title = 'Mở trong terminal';
+          openBtn.addEventListener('click', () => {
+            const txt = codeEl.textContent.trim();
+            const pathMatch = txt.match(/^[~/][\w./-]+\.(py|js|ts|sh|json|md|txt|yaml|yml|css|html)/m);
+            if(pathMatch) send_text_as_message(`Mở file ${pathMatch[0]} trong editor`);
+          });
+          pre.appendChild(openBtn);
         }
       }
     }
@@ -1629,18 +1677,66 @@ const QUIET_TOOL_LABELS = {
   schedule_task: 'Lên lịch',
 };
 
+// Tool group: nhóm các quiet-tool-line liên tiếp vào accordion
+let _toolGroupWrap = null;
+let _toolGroupCount = 0;
+let _toolGroupList = null;
+
+function _closeToolGroup(){
+  if(_toolGroupWrap && _toolGroupCount >= 3){
+    const header = _toolGroupWrap.querySelector('.tgroup-header');
+    if(header) header.querySelector('.tgroup-count').textContent = `${_toolGroupCount} bước`;
+  }
+  _toolGroupWrap = null; _toolGroupCount = 0; _toolGroupList = null;
+}
+
 function addQuietToolRow(name, input){
-  const w = wrap();
   const title = QUIET_TOOL_LABELS[name] || name.replace(/_/g, ' ');
   const hint = toolInputSummary(name, input).slice(0, 120);
-  w.innerHTML = `<div class="quiet-tool-line">
+  const rowHtml = `<div class="quiet-tool-line">
     <span class="quiet-tool-dot" aria-hidden="true"></span>
     <span class="quiet-tool-title">${esc(title)}</span>
     <span class="quiet-tool-hint">${esc(hint)}</span>
     <span class="quiet-tool-status">…</span>
   </div>`;
+
+  // Check if we can extend the current tool group
+  const lastChild = msgsEl.lastElementChild;
+  if(_toolGroupWrap && lastChild === _toolGroupWrap){
+    _toolGroupCount++;
+    const row = document.createElement('div');
+    row.className = 'mwrap';
+    row.innerHTML = rowHtml;
+    _toolGroupList.appendChild(row);
+    scrollEnd(false);
+    return row;
+  }
+
+  // Start a new group container
+  _closeToolGroup();
+  const groupWrap = wrap();
+  groupWrap.classList.add('tool-group-wrap');
+  groupWrap.innerHTML = `<div class="tgroup-header" role="button" tabindex="0" aria-expanded="true">
+    <span class="tgroup-count">1 bước</span>
+    <svg class="tgroup-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+  <div class="tgroup-list"></div>`;
+  const header = groupWrap.querySelector('.tgroup-header');
+  const list = groupWrap.querySelector('.tgroup-list');
+  header.addEventListener('click', ()=>{
+    const open = groupWrap.classList.toggle('tgroup-collapsed');
+    header.setAttribute('aria-expanded', String(!open));
+  });
+  const row = document.createElement('div');
+  row.className = 'mwrap';
+  row.innerHTML = rowHtml;
+  list.appendChild(row);
+
+  _toolGroupWrap = groupWrap;
+  _toolGroupCount = 1;
+  _toolGroupList = list;
   scrollEnd(false);
-  return w;
+  return row;
 }
 
 function finishQuietToolLine(wrap, result, maskedFlag){
@@ -4032,6 +4128,8 @@ async function send(){
 // Đảm bảo data-oculo="send" luôn gọi được (một số môi trường không gắn async function lên window)
 window.send = send;
 
+function send_text_as_message(t){ suggest(t, true); }
+
 function suggest(t, autoSend = true){
   inputEl.value=t;
   inputEl.dispatchEvent(new Event('input'));
@@ -4518,6 +4616,35 @@ function toggleSidebar(){
 function updateSidebarLayout(){
   document.body.classList.toggle('sidebar-overlay', window.innerWidth < 900);
 }
+
+// ── Resizable sidebar ──
+function _initSidebarResize(){
+  const handle = document.getElementById('sidebar-resize-handle');
+  const sidebar = document.getElementById('sidebar');
+  if(!handle || !sidebar) return;
+  let startX, startW;
+  handle.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    startX = e.clientX;
+    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 260;
+    handle.classList.add('dragging');
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp, {once:true});
+  });
+  function onMove(e){
+    const w = Math.min(420, Math.max(180, startW + (e.clientX - startX)));
+    document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+  }
+  function onUp(){
+    handle.classList.remove('dragging');
+    document.removeEventListener('pointermove', onMove);
+    const w = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim();
+    localStorage.setItem('oculo_sidebar_w', w);
+  }
+}
+// Restore saved sidebar width
+const _savedSidebarW = localStorage.getItem('oculo_sidebar_w');
+if(_savedSidebarW) document.documentElement.style.setProperty('--sidebar-w', _savedSidebarW);
 function syncHeaderHeight(){
   const hEl = document.querySelector('header');
   if(!hEl) return;
@@ -6197,6 +6324,7 @@ if(!_conversations.length){
 setViewMode(currentViewMode);
 updateSidebarLayout();
 initHeaderHeightSync();
+_initSidebarResize();
 fetchClientConfig()
   .then(() => {
     migrateModelIfExcluded();
