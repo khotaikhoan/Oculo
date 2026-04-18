@@ -280,7 +280,10 @@ def get_optional_anthropic_direct():
     return anthropic.Anthropic(api_key=k, base_url=os.getenv("ANTHROPIC_BASE_URL") or None)
 
 
-client = get_client()
+try:
+    client = get_client()
+except Exception:
+    client = None  # type: ignore[assignment]  — no API key yet; routes use get_client() per-request
 
 _OLLAMA_BASE_URL = (os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").rstrip("/")
 _ollama_service_proc: subprocess.Popen | None = None
@@ -409,7 +412,10 @@ Do NOT give vague reports. Always include real data.
 
 # Memory consolidation every 30 minutes
 def _memory_consolidate_job():
-    return memory_store.consolidate_old_memories(client)
+    try:
+        return memory_store.consolidate_old_memories(get_client())
+    except Exception:
+        pass
 
 
 scheduler.add_job(
@@ -775,7 +781,7 @@ def run_tool(name: str, inputs: dict) -> str:
             with open(path, "rb") as f:
                 img_b64 = base64.standard_b64encode(f.read()).decode()
             q = inputs.get("question", "Describe this screen")
-            r = client.messages.create(
+            r = get_client().messages.create(
                 model=DEFAULT_MODEL, max_tokens=1024,
                 messages=[{"role": "user", "content": [
                     {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
@@ -800,7 +806,7 @@ def run_tool(name: str, inputs: dict) -> str:
             if not schema or not source:
                 return "Error: schema va source la bat buoc"
             extract_tool = {"name": "extracted", "description": "Structured output", "input_schema": schema}
-            r = client.messages.create(
+            r = get_client().messages.create(
                 model=DEFAULT_MODEL, max_tokens=1024,
                 tools=[extract_tool],
                 tool_choice={"type": "tool", "name": "extracted"},
@@ -900,7 +906,7 @@ def serialize_content(blocks):
 
 
 def _anthropic_upstream_model_ids() -> list[str]:
-    ml = client.models.list()
+    ml = get_client().models.list()
     return [m.id for m in ml]
 
 
@@ -988,14 +994,14 @@ def _stream_agent_openai_compat(
         return build_memory_context(filtered)
 
     def _compress():
-        return compress_history(messages_for_compress, client)
+        return compress_history(messages_for_compress, get_client())
 
     def _decompose():
         if not use_tools:
             return []
         if os.getenv("AGENT_SKIP_DECOMPOSE", "").lower() in ("1", "true", "yes"):
             return []
-        return decompose_task(query, client)
+        return decompose_task(query, get_client())
 
     pref_prompt, prefs = "", None
     env_context = ""
@@ -1427,14 +1433,14 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
         return build_memory_context(filtered)
 
     def _compress():
-        return compress_history(messages_for_compress, client)
+        return compress_history(messages_for_compress, get_client())
 
     def _decompose():
         if not use_tools:
             return []
         if os.getenv("AGENT_SKIP_DECOMPOSE", "").lower() in ("1", "true", "yes"):
             return []
-        return decompose_task(query, client)
+        return decompose_task(query, get_client())
 
     pref_prompt, prefs = "", None
     env_context = ""
@@ -1577,7 +1583,7 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
             tool_results = []
             _blocks_by_id2 = {str(b.id): b for b in tool_blocks}
             for pr in parallel_results:
-                summarized = maybe_summarize(pr["name"], pr["result"], client)
+                summarized = maybe_summarize(pr["name"], pr["result"], get_client())
                 masked, was_masked = mask_with_flag(summarized)
                 tid = str(pr["tool_use_id"])
                 blk = _blocks_by_id2.get(tid)
@@ -1674,7 +1680,7 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
                         yield f"data: {json.dumps({**bfe, 'tool_use_id': str(block.id)})}\n\n"
 
                 # Tool summarization
-                result = maybe_summarize(block.name, result, client)
+                result = maybe_summarize(block.name, result, get_client())
 
                 # Mask sensitive data before yielding to client
                 masked_result, was_masked = mask_with_flag(result)
@@ -1953,7 +1959,7 @@ def pipeline():
 
     def generate():
         try:
-            for event in run_pipeline(task, client):
+            for event in run_pipeline(task, get_client()):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             traceback.print_exc()
@@ -2020,7 +2026,7 @@ def clear_memory():
 
 @app.route("/memory/consolidate", methods=["POST"])
 def consolidate_memory():
-    result = memory_store.consolidate_old_memories(client)
+    result = memory_store.consolidate_old_memories(get_client())
     return jsonify(result)
 
 
@@ -2246,7 +2252,7 @@ def generate_title():
     try:
         mdl = os.getenv("HAIKU_MODEL") or os.getenv("MODEL", DEFAULT_MODEL)
         prompt = f"Đặt tiêu đề ngắn (tối đa 5 từ) cho cuộc hội thoại này, tiếng Việt chuẩn có đầy đủ dấu: {sample}"
-        r = client.messages.create(
+        r = get_client().messages.create(
             model=mdl,
             max_tokens=30,
             messages=[{"role": "user", "content": prompt}],
