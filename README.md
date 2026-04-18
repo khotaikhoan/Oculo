@@ -332,6 +332,28 @@ bash build/macos/make_dmg.sh
 
 Output: `ai-agent/dist/Oculo.dmg`
 
+### Sau khi cài từ `.dmg` — app không mở?
+
+Bản build không có chữ ký Apple Developer, nên macOS Gatekeeper có thể chặn:
+
+1. **Cho phép lần đầu:** Chuột phải `Oculo.app` trong `Applications` → **Open** → **Open** lại trong hộp thoại cảnh báo. Sau đó mở bằng double-click bình thường.
+2. **Nếu vẫn bị chặn** ("app is damaged"): mở Terminal và gỡ quarantine:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Oculo.app
+   ```
+3. **Dữ liệu & cấu hình** ghi vào thư mục user (không ghi vào bundle read-only):
+   - `~/Library/Application Support/Oculo/chroma_db/` — bộ nhớ dài hạn
+   - `~/Library/Application Support/Oculo/data/task_progress.db` — checkpoint task
+   - `~/Library/Application Support/Oculo/browser_data/session.json` — session trình duyệt
+   - `~/Library/Application Support/Oculo/launch.log` — log khởi động (mở file này nếu app im lặng crash)
+4. **Đặt API key** sau khi cài: tạo file `~/Library/Application Support/Oculo/.env`:
+   ```env
+   ANTHROPIC_API_KEY=sk-ant-...
+   ANTHROPIC_BASE_URL=https://llm.chiasegpu.vn
+   MODEL=claude-sonnet-4.6
+   ```
+   Nếu chưa có key, app vẫn mở được và hiện trang chat; chỉ gọi model mới báo lỗi.
+
 ### Update nhanh (in-app notification)
 
 App có thể hiện thông báo “có bản mới” và mở trang tải.

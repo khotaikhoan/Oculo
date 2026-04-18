@@ -46,8 +46,10 @@ PROFILE_DIR = os.path.expanduser("~/.ai_agent_browser_profile")
 CDP_URL = os.getenv("CHROME_CDP_URL", "http://localhost:9222")
 CDP_PORT = 9222
 
-# Session export (cookies/localStorage snapshot) — bổ sung cho user_data_dir persistent
-STORAGE_PATH = Path(__file__).resolve().parent.parent / "browser_data" / "session.json"
+# Session export (cookies/localStorage snapshot) — bổ sung cho user_data_dir persistent.
+# Dùng app_paths để tránh ghi vào bundle .app read-only khi chạy frozen.
+from utils.app_paths import data_dir as _app_data_dir  # noqa: E402
+STORAGE_PATH = _app_data_dir("browser_data") / "session.json"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

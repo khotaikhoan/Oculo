@@ -3,12 +3,17 @@ Long-term memory using ChromaDB + sentence-transformers embeddings.
 Stores facts, summaries, and past interactions across sessions.
 """
 import os
+import sys
 import json
 import chromadb
 from datetime import datetime
 from chromadb.utils import embedding_functions
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
+# Ghi ChromaDB ra thư mục user-writable khi app chạy từ .app bundle (read-only).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.app_paths import data_dir  # noqa: E402
+
+DB_PATH = str(data_dir("chroma_db"))
 
 # Use local sentence-transformers (no API key needed)
 _ef = embedding_functions.SentenceTransformerEmbeddingFunction(
