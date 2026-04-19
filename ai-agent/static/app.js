@@ -187,6 +187,63 @@ function toggleDensity(){
 // Apply saved density on load
 if(localStorage.getItem('oculo_density') === 'compact') document.body.classList.add('density-compact');
 
+// ── Split-Panel Tool Preview ──
+let _splitPanelActive = localStorage.getItem('oculo_split_panel') === '1';
+let _splitPanelW = Math.max(280, Math.min(720, parseInt(localStorage.getItem('oculo_split_panel_w') || '420', 10)));
+
+function _applySplitPanel(){
+  document.documentElement.style.setProperty('--split-panel-w', _splitPanelW + 'px');
+  document.body.classList.toggle('split-view', _splitPanelActive);
+  const btn = document.getElementById('split-panel-btn');
+  if(btn) btn.classList.toggle('active', _splitPanelActive);
+  // In split mode, ensure browser panel is visible if we have a frame
+  if(_splitPanelActive && _blp && _blp.lastB64 && !_blp._manuallyHidden){
+    _blp.show();
+  }
+}
+
+function toggleSplitPanel(){
+  _splitPanelActive = !_splitPanelActive;
+  localStorage.setItem('oculo_split_panel', _splitPanelActive ? '1' : '0');
+  _applySplitPanel();
+  // Auto-show the panel when enabling
+  if(_splitPanelActive && _blp){
+    _blp._manuallyHidden = false;
+    _blp.show();
+  }
+}
+
+function _initSplitResize(){
+  const handle = document.getElementById('blp-resize-handle');
+  if(!handle) return;
+  let _dragging = false, _startX = 0, _startW = 0;
+  handle.addEventListener('pointerdown', e => {
+    if(!_splitPanelActive) return;
+    _dragging = true;
+    _startX = e.clientX;
+    _startW = _splitPanelW;
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', e => {
+    if(!_dragging) return;
+    const dx = _startX - e.clientX; // drag left = wider panel
+    const newW = Math.max(280, Math.min(720, _startW + dx));
+    _splitPanelW = newW;
+    document.documentElement.style.setProperty('--split-panel-w', newW + 'px');
+  });
+  handle.addEventListener('pointerup', () => {
+    if(!_dragging) return;
+    _dragging = false;
+    handle.classList.remove('dragging');
+    localStorage.setItem('oculo_split_panel_w', _splitPanelW);
+  });
+}
+
+// Apply on load
+_applySplitPanel();
+
 // ── Time-based accent color ──
 (function _applyTimeAccent(){
   const h = new Date().getHours();
@@ -6022,6 +6079,10 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();
     toggleModelPicker();
   }
+  if(e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'p' || e.key === 'P')){
+    e.preventDefault();
+    toggleSplitPanel();
+  }
   if(e.key==='Escape'){
     if(closeModelPicker()){ e.preventDefault(); return; }
     closeSearch();
@@ -6325,6 +6386,7 @@ setViewMode(currentViewMode);
 updateSidebarLayout();
 initHeaderHeightSync();
 _initSidebarResize();
+_initSplitResize();
 fetchClientConfig()
   .then(() => {
     migrateModelIfExcluded();
