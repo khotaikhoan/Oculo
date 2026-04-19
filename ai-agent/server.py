@@ -2342,7 +2342,7 @@ def restore_cp(cp_id):
 def generate_title():
     messages = (request.get_json(silent=True) or {}).get("messages", [])
     if not messages:
-        return jsonify({"title": "Cuộc hội thoại mới"})
+        return jsonify({"title": "Cuộc hội thoại mới", "tags": []})
     sample = " ".join([
         m.get("content", "")[:100]
         for m in messages[:3]
@@ -2352,9 +2352,31 @@ def generate_title():
         prompt = f"Đặt tiêu đề ngắn (tối đa 5 từ) cho cuộc hội thoại này, tiếng Việt chuẩn có đầy đủ dấu: {sample}"
         title = _try_messages_completion(prompt, 30) or "Cuộc hội thoại"
         title = title.strip().strip('"\'')
-        return jsonify({"title": title[:50]})
+
+        # Phân loại vào tags
+        tags: list[str] = []
+        try:
+            valid = {"code", "research", "automation", "file-ops", "analysis", "casual", "debug"}
+            tags_prompt = (
+                "Phân loại cuộc trò chuyện sau vào 1 hoặc 2 thẻ từ danh sách này:\n"
+                "code (viết/sửa code), research (tìm kiếm thông tin), automation (tự động hóa macOS/browser), "
+                "file-ops (đọc/ghi file), analysis (phân tích dữ liệu/ảnh), casual (trò chuyện thường), debug (sửa lỗi).\n"
+                "Chỉ trả về các thẻ phân cách bởi dấu phẩy, không giải thích.\n\n"
+                f"Nội dung: {sample}"
+            )
+            tags_out = _try_messages_completion(tags_prompt, 30) or ""
+            raw = [t.strip().lower().strip("#") for t in tags_out.replace("\n", ",").split(",")]
+            for t in raw:
+                if t in valid and t not in tags:
+                    tags.append(t)
+                if len(tags) >= 2:
+                    break
+        except Exception:
+            pass
+
+        return jsonify({"title": title[:50], "tags": tags})
     except Exception:
-        return jsonify({"title": "Cuộc hội thoại"})
+        return jsonify({"title": "Cuộc hội thoại", "tags": []})
 
 
 @app.route("/list-files", methods=["GET"])

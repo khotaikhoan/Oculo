@@ -989,9 +989,16 @@ inputEl.addEventListener('input',()=>{
       localStorage.removeItem('chat_draft');
     }
   }
-  // @ mention detection
+  // Slash command palette detection — gõ / ở đầu dòng
   const val = inputEl.value;
   const pos = inputEl.selectionStart;
+  if(val.startsWith('/') && !val.includes(' ')){
+    const query = val.slice(1);
+    _openSlashPalette(query);
+  } else {
+    _closeSlashPalette();
+  }
+  // @ mention detection
   const atIdx = val.lastIndexOf('@', pos - 1);
   if(atIdx >= 0 && (atIdx === 0 || /\s/.test(val[atIdx - 1]))){
     const query = val.slice(atIdx + 1, pos);
@@ -1002,6 +1009,8 @@ inputEl.addEventListener('input',()=>{
   }
   // #2 Character count
   _updateCharCount();
+  // Input Temperature Meter — viền đổi màu theo độ dài
+  _applyInputTemperature();
   // #3 Send button glow khi có content
   const hasContent = inputEl.value.trim().length > 0;
   sendBtn.classList.toggle('has-content', hasContent);
@@ -1056,9 +1065,10 @@ if (inputEl){
       setTimeout(() => _openAtMentionPicker(), 10);
     }
 
-    // Đóng @ picker khi Escape
+    // Đóng picker khi Escape
     if(e.key === 'Escape'){
       _closeAtMentionPicker();
+      _closeSlashPalette();
     }
 
     if (!_isEnterKey(e) || e.shiftKey) return;
@@ -1857,13 +1867,141 @@ function finishCard(card, result, maskedFlag){
   };
   body.style.position = 'relative';
   body.appendChild(copyResultBtn);
-  const resultHtml = looksLikeMarkdown(result)
-    ? '<div class="tresult-label tresult-label--pad">Kết quả</div><div class="tresult-md">' + safeMarkdown(result) + '</div>'
-    : '<div class="tresult-label tresult-label--pad">Kết quả</div><div class="tresult-raw">' + esc(result) + '</div>';
-  body.insertAdjacentHTML('beforeend', resultHtml);
+
+  // ── Rich result rendering (Feature 4) ──
+  const toolName = card.querySelector('.tname')?.textContent || '';
+  body.insertAdjacentHTML('beforeend', '<div class="tresult-label tresult-label--pad">Kết quả</div>');
+  _renderRichToolResult(body, toolName, result);
+
   if(maskedFlag){
     body.insertAdjacentHTML('beforeend', '<div class="tresult-mask-note" role="status">Một phần nội dung có thể đã được ẩn (khóa API, v.v.) trước khi hiển thị</div>');
   }
+}
+
+function _tryParseJSON(str){
+  const s = (str||'').trim();
+  if(!(s.startsWith('{') || s.startsWith('[') || s.startsWith('"'))) return null;
+  try{ return JSON.parse(s); }catch{ return null; }
+}
+
+function _colorizeJSON(obj, depth){
+  if(depth === undefined) depth = 0;
+  if(depth > 6) return '<span class="jstr">…</span>';
+  if(obj === null) return '<span class="jnull">null</span>';
+  if(typeof obj === 'boolean') return '<span class="jbool">' + obj + '</span>';
+  if(typeof obj === 'number') return '<span class="jnum">' + obj + '</span>';
+  if(typeof obj === 'string') return '<span class="jstr">' + esc(JSON.stringify(obj)) + '</span>';
+  if(Array.isArray(obj)){
+    if(!obj.length) return '[]';
+    const items = obj.slice(0,12).map(v => '  '.repeat(depth+1) + _colorizeJSON(v, depth+1));
+    const tail = obj.length > 12 ? ['  '.repeat(depth+1) + '<span class="jstr">… (' + (obj.length-12) + ' more)</span>'] : [];
+    return '[\n' + [...items,...tail].join(',\n') + '\n' + '  '.repeat(depth) + ']';
+  }
+  const keys = Object.keys(obj);
+  const items = keys.slice(0,20).map(k => '  '.repeat(depth+1) + '<span class="jkey">' + esc(JSON.stringify(k)) + '</span>: ' + _colorizeJSON(obj[k], depth+1));
+  if(keys.length > 20) items.push('  '.repeat(depth+1) + '<span class="jstr">… (' + (keys.length-20) + ' more keys)</span>');
+  return '{\n' + items.join(',\n') + '\n' + '  '.repeat(depth) + '}';
+}
+
+function _renderRichToolResult(body, toolName, result){
+  const str = String(result||'');
+
+  // 1. Screenshot / base64 image — detect "data:image" or server returning path-like strings
+  const b64Match = str.match(/data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)/);
+  if(b64Match){
+    const wrap = document.createElement('div');
+    wrap.className = 'tresult-img-wrap';
+    const img = document.createElement('img');
+    img.src = b64Match[0];
+    img.alt = 'Screenshot';
+    wrap.appendChild(img);
+    wrap.addEventListener('click', ()=>{
+      const lb = document.getElementById('cu-lightbox');
+      const lbImg = document.getElementById('cu-lightbox-img');
+      if(lb && lbImg){ lbImg.src = b64Match[0]; lb.style.display='flex'; }
+    });
+    body.appendChild(wrap);
+    return;
+  }
+
+  // 2. JSON result — parse and colorize
+  const parsed = _tryParseJSON(str);
+  if(parsed !== null){
+    const pre = document.createElement('pre');
+    pre.className = 'tresult-json';
+    pre.innerHTML = _colorizeJSON(parsed);
+    body.appendChild(pre);
+    return;
+  }
+
+  // 3. Code-like file content (read_file)
+  const isFileResult = toolName === 'read_file' || toolName === 'write_file';
+  const isCodeLike = /^(import |def |function |class |#!|<!DOCTYPE|<html|package |from |const |let |var )/m.test(str.slice(0, 500));
+  if(isFileResult && isCodeLike){
+    const wrap = document.createElement('div');
+    wrap.className = 'tresult-code-preview';
+    const code = document.createElement('code');
+    const lines = str.split('\n');
+    code.textContent = lines.slice(0, 40).join('\n') + (lines.length > 40 ? '\n…' : '');
+    wrap.appendChild(code);
+    body.appendChild(wrap);
+    // Highlight if hljs available
+    if(typeof hljs !== 'undefined') try{ hljs.highlightElement(code); }catch(_){}
+    if(lines.length > 40){
+      _appendExpandBtn(body, str, wrap, code, lines);
+    }
+    return;
+  }
+
+  // 4. Long plain text — show with collapse/expand
+  if(str.length > 600){
+    const container = document.createElement('div');
+    container.className = 'tresult-raw collapsible collapsed';
+    container.textContent = str;
+    body.appendChild(container);
+    const btn = document.createElement('button');
+    btn.className = 'tresult-expand-btn';
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem thêm';
+    let expanded = false;
+    btn.addEventListener('click', ()=>{
+      expanded = !expanded;
+      container.classList.toggle('collapsed', !expanded);
+      btn.innerHTML = expanded
+        ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg> Thu gọn'
+        : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem thêm';
+    });
+    body.appendChild(btn);
+    return;
+  }
+
+  // 5. Fallback — markdown or plain text
+  if(looksLikeMarkdown(str)){
+    const div = document.createElement('div');
+    div.className = 'tresult-md';
+    div.innerHTML = safeMarkdown(str);
+    body.appendChild(div);
+  } else {
+    const div = document.createElement('div');
+    div.className = 'tresult-raw';
+    div.textContent = str;
+    body.appendChild(div);
+  }
+}
+
+function _appendExpandBtn(body, fullStr, preWrap, codeEl, lines){
+  const btn = document.createElement('button');
+  btn.className = 'tresult-expand-btn';
+  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem đầy đủ (' + lines.length + ' dòng)';
+  let expanded = false;
+  btn.addEventListener('click', ()=>{
+    expanded = !expanded;
+    codeEl.textContent = expanded ? fullStr : lines.slice(0, 40).join('\n') + '\n…';
+    if(typeof hljs !== 'undefined') try{ hljs.highlightElement(codeEl); }catch(_){}
+    btn.innerHTML = expanded
+      ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg> Thu gọn'
+      : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem đầy đủ (' + lines.length + ' dòng)';
+  });
+  body.appendChild(btn);
 }
 
 // ── Tool execution timeline (một block / lượt trả lời tới khi done) ──
@@ -3817,6 +3955,8 @@ async function send(){
     if(busy && (text || pendingFiles.length)) showToast('Đang chờ phản hồi trước đó…', 2200);
     return;
   }
+  // Request notification permission lần đầu user gửi (one-time prompt)
+  _requestNotifPermission();
   // Blur sau khi chắc chắn sẽ gửi — tránh mất focus khi gõ Enter lúc đang busy / ô trống
   inputEl.blur();
   // Fade hint bar after 3 successful sends
@@ -3862,7 +4002,7 @@ async function send(){
   // Remove stale follow-ups from previous turn
   document.querySelectorAll('.followup-wrap,.continue-wrap').forEach(el=>el.remove());
 
-  let reply='',_turnCollapsibles=[],_turnToolNames=[],turnToolCalls=[],turnToolResults=[];
+  let reply='',_turnCollapsibles=[],_turnToolNames=[],turnToolCalls=[],turnToolResults=[],_turnErrorCount=0;
   let undoToastDismissed = false;
   const activityStreamId = currentStreamId;
   execResetBlockState();
@@ -3954,6 +4094,10 @@ async function send(){
               content: d.result != null ? String(d.result) : (d.content != null ? String(d.content) : '')
             });
           }catch{}
+          // Track tool errors cho success pulse + calm mode decision
+          const _resultText = d.result != null ? String(d.result) : (d.content != null ? String(d.content) : '');
+          const _isErr = typeof d.is_error === 'boolean' ? d.is_error : _toolResultLooksLikeError(_resultText);
+          if(_isErr){ _turnErrorCount++; _recordError(); }
           const masked = !!d.masked;
           execApplyToolResult({ ...d, masked });
           curBubble=null;
@@ -4115,9 +4259,24 @@ async function send(){
             fetch('/generate-title',{method:'POST',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({messages:history})})
               .then(r=>r.ok ? r.json() : null).then(d=>{
-                if(d && d.title) saveConvTitle(d.title);
+                if(!d) return;
+                if(d.title) saveConvTitle(d.title);
+                if(Array.isArray(d.tags)) saveConvTags(d.tags);
               }).catch(()=>{});
           }
+          // Desktop notification + badge khi window không focus
+          _notifyAgentDone(_lastAnswer);
+          // Success pulse — task phức tạp xong không lỗi
+          if(_turnToolNames.length >= 5 && _turnErrorCount === 0){
+            _triggerSuccessPulse(_turnToolNames.length);
+          }
+          // Exit calm mode khi có 1 lượt thành công sau lỗi
+          if(_calmModeActive && _turnErrorCount === 0 && reply.length > 20){
+            _exitCalmMode();
+          }
+          // Proactive action suggestions (tool-based, deterministic)
+          const _proactive = _generateProactiveActions(_turnToolNames);
+          if(_proactive.length) setTimeout(()=>_showProactiveBar(_proactive), 300);
           // Hide model badge after done — giữ hiển thị, chỉ bỏ animation
           setTimeout(()=>{
             const b=document.getElementById('model-badge');
@@ -4151,6 +4310,7 @@ async function send(){
           AmbientWidget.onStreamError(d.content);
           execFinalizeBlock();
           showChatError(d.content,text,reply);
+          _recordError();
           sseFatal=true;
           break;
         }
@@ -4260,6 +4420,7 @@ function loadConversations(){
     _conversations = JSON.parse(localStorage.getItem(CONV_KEY)||'[]');
   }catch(e){ _conversations=[]; }
   renderConvList();
+  renderTagFilters();
 }
 
 function saveConversations(){
@@ -4284,6 +4445,144 @@ function saveConvTitle(title){
   if(!_activeConvId) return;
   const conv = _conversations.find(c=>c.id===_activeConvId);
   if(conv){ conv.title=_cleanTitle(title); conv.updatedAt=Date.now(); saveConversations(); renderConvList(); }
+}
+
+// Smart conversation tags — lưu + render trong sidebar
+const VALID_CONV_TAGS = new Set(['code','research','automation','file-ops','analysis','casual','debug']);
+const TAG_LABELS = {
+  code:'Code', research:'Research', automation:'Automation',
+  'file-ops':'File Ops', analysis:'Analysis', casual:'Casual', debug:'Debug',
+};
+
+function saveConvTags(tags){
+  if(!_activeConvId || !Array.isArray(tags)) return;
+  const filtered = tags.map(t => String(t||'').trim().toLowerCase()).filter(t => VALID_CONV_TAGS.has(t)).slice(0, 2);
+  const conv = _conversations.find(c=>c.id===_activeConvId);
+  if(conv){ conv.tags = filtered; conv.updatedAt = Date.now(); saveConversations(); renderConvList(); renderTagFilters(); }
+}
+
+let _tagFilter = null; // null = show all
+
+function renderTagFilters(){
+  const wrap = document.getElementById('conv-tag-filters');
+  if(!wrap) return;
+  const counts = {};
+  _conversations.forEach(c => (c.tags||[]).forEach(t => { counts[t] = (counts[t]||0) + 1; }));
+  const tagList = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+  if(!tagList.length){ wrap.innerHTML = ''; return; }
+
+  const chips = [
+    `<button type="button" class="tag-filter-chip${_tagFilter === null ? ' active' : ''}" data-filter-tag="">Tất cả <span class="tag-count">${_conversations.length}</span></button>`,
+    ...tagList.map(t => `<button type="button" class="tag-filter-chip${_tagFilter === t ? ' active' : ''}" data-tag="${esc(t)}" data-filter-tag="${esc(t)}">${esc(TAG_LABELS[t] || t)} <span class="tag-count">${counts[t]}</span></button>`),
+  ];
+  wrap.innerHTML = chips.join('');
+  wrap.querySelectorAll('.tag-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const t = chip.getAttribute('data-filter-tag');
+      _tagFilter = t ? t : null;
+      renderTagFilters();
+      renderConvList();
+    });
+  });
+}
+
+// ══════════════════════════════════════════
+// ── DESKTOP NOTIFICATION + FAVICON BADGE ──
+// ══════════════════════════════════════════
+let _unreadCount = 0;
+let _windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true;
+let _origFaviconHref = null;
+let _origDocTitle = null;
+
+function _initNotificationSystem(){
+  _origFaviconHref = document.getElementById('app-favicon')?.getAttribute('href') || '';
+  _origDocTitle = document.title;
+  window.addEventListener('focus', () => {
+    _windowFocused = true;
+    _unreadCount = 0;
+    document.body.classList.remove('has-unread');
+    _updateFaviconBadge();
+  });
+  window.addEventListener('blur', () => { _windowFocused = false; });
+}
+
+function _requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'default'){
+    try{ Notification.requestPermission(); }catch(_){}
+  }
+}
+
+function _notifyAgentDone(reply){
+  if(_windowFocused) return;
+  const preview = String(reply||'').replace(/\s+/g,' ').trim().slice(0, 120);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{
+      const n = new Notification('Oculo xong rồi ✓', {
+        body: preview || 'Agent đã hoàn thành tác vụ',
+        icon: _origFaviconHref || undefined,
+        tag: 'oculo-agent-done',
+        silent: false,
+      });
+      n.onclick = () => { try{ window.focus(); }catch(_){} n.close(); };
+      setTimeout(() => { try{ n.close(); }catch(_){} }, 6000);
+    }catch(_){}
+  }
+  _unreadCount++;
+  document.body.classList.add('has-unread');
+  _updateFaviconBadge();
+}
+
+function _updateFaviconBadge(){
+  const link = document.getElementById('app-favicon');
+  if(!link) return;
+  if(_unreadCount <= 0){
+    if(_origFaviconHref) link.setAttribute('href', _origFaviconHref);
+    document.title = _origDocTitle || 'Oculo';
+    return;
+  }
+  // Vẽ favicon với badge số ở góc trên phải
+  try{
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    // Nền gradient giống favicon gốc
+    const grad = ctx.createLinearGradient(0,0,64,64);
+    grad.addColorStop(0, '#7c9fff');
+    grad.addColorStop(1, '#a78bfa');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(0,0,64,64,14) : ctx.rect(0,0,64,64);
+    ctx.fill();
+    // Vẽ mắt Oculo đơn giản (vòng tròn)
+    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(32, 32, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(32, 32, 3, 0, Math.PI*2); ctx.fill();
+    // Badge đỏ góc trên phải với số
+    const badge = Math.min(_unreadCount, 99);
+    const badgeText = badge >= 99 ? '99+' : String(badge);
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.arc(50, 14, 14, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(50, 14, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px system-ui,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, 50, 15);
+    link.setAttribute('href', canvas.toDataURL('image/png'));
+  }catch(_){}
+  document.title = `(${_unreadCount}) ${_origDocTitle || 'Oculo'}`;
+}
+
+// Khởi tạo + request permission lần đầu user gửi tin
+if(typeof document !== 'undefined'){
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', _initNotificationSystem);
+  } else {
+    _initNotificationSystem();
+  }
 }
 
 function saveCurrentConv(){
@@ -4511,6 +4810,9 @@ function _convItemHTML(c){
   const editSvg  = `<svg ${S}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>`;
 
   const cid = encodeURIComponent(c.id);
+  const tagsHtml = (c.tags && c.tags.length)
+    ? `<div class="conv-tags">${c.tags.map(t => `<span class="conv-tag" data-tag="${esc(t)}">${esc(TAG_LABELS[t] || t)}</span>`).join('')}</div>`
+    : '';
   return `<div class="conv-item ${isActive?'active':''} ${isPinned?'pinned':''}"
     data-oculo="switchConversation"
     data-conv-id="${cid}"
@@ -4522,6 +4824,7 @@ function _convItemHTML(c){
         ${countBadge}
       </div>
       ${preview ? `<span class="conv-preview">${esc(preview)}</span>` : ''}
+      ${tagsHtml}
     </div>
     <div class="conv-actions">
       <button type="button" class="conv-act pin-btn" data-oculo="togglePinConv" data-conv-id="${cid}" data-oculo-stop title="${isPinned?'Bỏ ghim':'Ghim'}">
@@ -4560,8 +4863,11 @@ function renderConvList(){
     return;
   }
 
-  // Filter by search
+  // Filter by search + tag
   let convs = _conversations;
+  if(_tagFilter){
+    convs = convs.filter(c => Array.isArray(c.tags) && c.tags.includes(_tagFilter));
+  }
   if(_convSearchQuery){
     convs = convs.filter(c=>
       (c.title||'').toLowerCase().includes(_convSearchQuery) ||
@@ -5079,6 +5385,121 @@ if(inputEl){
     }
   }, true); // capture để chạy trước handler Enter
 }
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 1 — SLASH COMMAND PALETTE
+// ═══════════════════════════════════════════════════════════════
+
+const SLASH_COMMANDS = [
+  { cmd:'new',       label:'Hội thoại mới',     desc:'Tạo cuộc hội thoại mới',            icon:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',                                                    action: ()=>{ _slashDone(); newConversation(); } },
+  { cmd:'model',     label:'Đổi model',          desc:'Mở bộ chọn model AI  (⌥M)',         icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',  action: ()=>{ _slashDone(); toggleModelPicker(); } },
+  { cmd:'memory',    label:'Bộ nhớ dài hạn',     desc:'Xem và tìm kiếm bộ nhớ agent',      icon:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',                                            action: ()=>{ _slashDone(); openMemory(); } },
+  { cmd:'skills',    label:'Kỹ năng agent',       desc:'Chọn chuyên môn cho agent',         icon:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',                                                                    action: ()=>{ _slashDone(); openSkills(); } },
+  { cmd:'pipeline',  label:'Pipeline đa agent',   desc:'Nghiên cứu → Thực thi → Đánh giá', icon:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>', action: ()=>{ _slashDone(); openPipeline(); } },
+  { cmd:'settings',  label:'Cấu hình',            desc:'Chỉnh model, temperature, prompt',  icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4"/>',  action: ()=>{ _slashDone(); openSettings(); } },
+  { cmd:'clear',     label:'Xóa chat',            desc:'Xóa toàn bộ nội dung chat hiện tại',icon:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',                                               action: ()=>{ _slashDone(); clearChat(); } },
+  { cmd:'theme',     label:'Đổi giao diện',       desc:'Chuyển đổi sáng / tối',             icon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',                                                                                                                   action: ()=>{ _slashDone(); toggleThemeUI(); } },
+  { cmd:'split',     label:'Split panel',         desc:'Bật/tắt chia đôi màn hình (⌥P)',   icon:'<rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',                                                                                        action: ()=>{ _slashDone(); toggleSplitPanel(); } },
+  { cmd:'export',    label:'Xuất hội thoại',      desc:'Lưu dưới dạng JSON',                icon:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',                                               action: ()=>{ _slashDone(); exportChat(); } },
+  { cmd:'shortcuts', label:'Phím tắt',            desc:'Xem toàn bộ phím tắt',              icon:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/>',                                                                                                     action: ()=>{ _slashDone(); openShortcuts(); } },
+  { cmd:'monitor',   label:'Giám sát',            desc:'Theo dõi file, lịch, hệ thống',     icon:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',                                                                                                                                          action: ()=>{ _slashDone(); openMonitor(); } },
+];
+
+let _slashOpen = false;
+let _slashIdx = 0;
+let _slashFiltered = [];
+
+function _slashDone(){
+  if(inputEl){ inputEl.value = ''; inputEl.dispatchEvent(new Event('input')); }
+  _closeSlashPalette();
+}
+
+function _openSlashPalette(query){
+  _slashOpen = true;
+  const el = document.getElementById('slash-palette');
+  if(el) el.hidden = false;
+  _filterSlashPalette(query);
+}
+
+function _closeSlashPalette(){
+  _slashOpen = false;
+  const el = document.getElementById('slash-palette');
+  if(el) el.hidden = true;
+}
+
+function _highlightMatch(text, query){
+  if(!query) return esc(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if(idx < 0) return esc(text);
+  return esc(text.slice(0, idx)) + '<em>' + esc(text.slice(idx, idx + query.length)) + '</em>' + esc(text.slice(idx + query.length));
+}
+
+function _filterSlashPalette(query){
+  const q = (query||'').toLowerCase().trim();
+  _slashFiltered = q
+    ? SLASH_COMMANDS.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+    : SLASH_COMMANDS;
+  _slashIdx = 0;
+  _renderSlashPalette(q);
+}
+
+function _renderSlashPalette(query){
+  const list = document.getElementById('slash-palette-list');
+  if(!list) return;
+  if(!_slashFiltered.length){
+    list.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:var(--text-sm)">Không tìm thấy lệnh</div>';
+    return;
+  }
+  list.innerHTML = _slashFiltered.map((c, i) => `
+    <div class="slash-cmd${i === _slashIdx ? ' slash-active' : ''}" data-slash-idx="${i}" role="option" aria-selected="${i === _slashIdx}">
+      <span class="slash-cmd-icon"><svg viewBox="0 0 24 24">${c.icon}</svg></span>
+      <span class="slash-cmd-body">
+        <span class="slash-cmd-name">/${_highlightMatch(c.cmd, query)}</span>
+        <span class="slash-cmd-desc">${esc(c.label)} — ${esc(c.desc)}</span>
+      </span>
+      <span class="slash-cmd-kbd">↵</span>
+    </div>`).join('');
+
+  list.querySelectorAll('.slash-cmd').forEach((el, i) => {
+    el.addEventListener('mousedown', e => { e.preventDefault(); _slashFiltered[i]?.action?.(); });
+    el.addEventListener('mouseover', () => { _slashIdx = i; _renderSlashPalette(query); });
+  });
+
+  const active = list.querySelector('.slash-active');
+  if(active) active.scrollIntoView({ block: 'nearest' });
+}
+
+// Hook into keydown (capture phase) to intercept arrow + enter in palette
+if(inputEl){
+  inputEl.addEventListener('keydown', e => {
+    if(!_slashOpen) return;
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      _slashIdx = Math.min(_slashIdx + 1, _slashFiltered.length - 1);
+      const q = inputEl.value.slice(1);
+      _renderSlashPalette(q);
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      _slashIdx = Math.max(_slashIdx - 1, 0);
+      const q = inputEl.value.slice(1);
+      _renderSlashPalette(q);
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      _slashFiltered[_slashIdx]?.action?.();
+    } else if(e.key === 'Escape'){
+      _closeSlashPalette();
+    }
+  }, true);
+}
+
+// Close slash palette when clicking outside
+document.addEventListener('mousedown', e => {
+  if(!_slashOpen) return;
+  const pal = document.getElementById('slash-palette');
+  const inp = document.getElementById('input-area');
+  if(pal && !pal.contains(e.target) && (!inp || !inp.contains(e.target))) _closeSlashPalette();
+}, true);
 
 function toggleMoreMenu(){
   const menu = document.getElementById('hmore-menu');
@@ -5804,6 +6225,164 @@ function updateCtxMeter(inputTokens){
   pctEl.textContent = pct + '%';
   pctEl.className = 'ctx-pct' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
   tokEl.textContent = `${(_ctxTokensTotal/1000).toFixed(1)}k / ${(CTX_LIMIT/1000).toFixed(0)}k`;
+}
+
+// ══════════════════════════════════════════
+// ── ADAPTIVE COLOR BEHAVIOR ──
+// Success Pulse + Error Recovery Palette + Input Temperature
+// ══════════════════════════════════════════
+const _recentErrorsTs = []; // timestamps of recent errors
+const ERROR_WINDOW_MS = 60_000;  // 60s window
+const ERROR_THRESHOLD = 2;        // 2 errors → calm mode
+let _calmModeActive = false;
+
+function _recordError(){
+  const now = Date.now();
+  _recentErrorsTs.push(now);
+  // Keep only errors within window
+  while(_recentErrorsTs.length && now - _recentErrorsTs[0] > ERROR_WINDOW_MS){
+    _recentErrorsTs.shift();
+  }
+  if(_recentErrorsTs.length >= ERROR_THRESHOLD && !_calmModeActive){
+    _enterCalmMode();
+  }
+}
+
+function _enterCalmMode(){
+  _calmModeActive = true;
+  document.body.classList.add('calm-mode');
+  // Show subtle hint
+  try{ showToast('Đã chuyển sang chế độ êm dịu sau vài lỗi — sẽ tự khôi phục khi chạy ổn lại', 4200); }catch(_){}
+}
+
+function _exitCalmMode(){
+  if(!_calmModeActive) return;
+  _calmModeActive = false;
+  document.body.classList.remove('calm-mode');
+  _recentErrorsTs.length = 0;
+}
+
+function _triggerSuccessPulse(toolCount){
+  // Flash pulse khi task phức tạp xong không lỗi
+  document.body.classList.remove('success-pulse');
+  // Force reflow để animation restart
+  void document.body.offsetWidth;
+  document.body.classList.add('success-pulse');
+  const duration = Math.min(1400, 800 + toolCount * 50);
+  setTimeout(() => document.body.classList.remove('success-pulse'), duration);
+}
+
+// Input Temperature Meter — cập nhật màu viền theo độ dài input
+function _applyInputTemperature(){
+  const wrap = document.getElementById('iwrap');
+  if(!wrap || !inputEl) return;
+  const len = inputEl.value.length;
+  let temp;
+  if(len === 0) temp = '';
+  else if(len < 50) temp = 'cold';
+  else if(len < 300) temp = 'cool';
+  else if(len < 1000) temp = 'warm';
+  else temp = 'hot';
+  if(temp) wrap.setAttribute('data-input-temp', temp);
+  else wrap.removeAttribute('data-input-temp');
+}
+
+
+// ══════════════════════════════════════════
+const TOOL_PROACTIVE_ACTIONS = {
+  write_file: [
+    { text: 'Commit vào git', icon: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>' },
+    { text: 'Đọc lại file vừa ghi', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>' },
+    { text: 'Chạy test/lint', icon: '<polyline points="9 11 12 14 22 4"/>' },
+  ],
+  read_file: [
+    { text: 'Chỉnh sửa file này', icon: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>' },
+    { text: 'Tóm tắt nội dung ngắn', icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>' },
+    { text: 'Tìm file tương tự', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' },
+  ],
+  browser_navigate: [
+    { text: 'Chụp màn hình trang', icon: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>' },
+    { text: 'Scroll xuống & phân tích', icon: '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>' },
+    { text: 'Trích xuất dữ liệu', icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/>' },
+  ],
+  browser_click: [
+    { text: 'Chụp kết quả sau click', icon: '<circle cx="12" cy="13" r="4"/>' },
+    { text: 'Click element tiếp theo', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+  ],
+  browser_fill: [
+    { text: 'Submit form', icon: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>' },
+    { text: 'Chụp form sau khi điền', icon: '<circle cx="12" cy="13" r="4"/>' },
+  ],
+  run_shell: [
+    { text: 'Chạy lại lệnh', icon: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>' },
+    { text: 'Xem log đầy đủ', icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>' },
+    { text: 'Debug lỗi nếu có', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+  ],
+  screenshot_and_analyze: [
+    { text: 'Zoom vào vùng cụ thể', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>' },
+    { text: 'Click element đang thấy', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+    { text: 'Trích xuất text (OCR)', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
+  ],
+  extract_data: [
+    { text: 'Lưu dữ liệu vào file', icon: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>' },
+    { text: 'Phân tích thêm dữ liệu', icon: '<path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>' },
+  ],
+  remember: [
+    { text: 'Xem toàn bộ bộ nhớ', icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>' },
+  ],
+  recall: [
+    { text: 'Lưu kết quả vào bộ nhớ', icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/>' },
+  ],
+  open_app: [
+    { text: 'Chụp màn hình app', icon: '<circle cx="12" cy="13" r="4"/>' },
+  ],
+};
+
+function _generateProactiveActions(toolNames){
+  if(!toolNames?.length) return [];
+  const actions = [];
+  const seen = new Set();
+  // Ưu tiên tool gần nhất trước
+  for(const t of [...toolNames].reverse()){
+    const lst = TOOL_PROACTIVE_ACTIONS[t];
+    if(!lst) continue;
+    for(const a of lst){
+      if(seen.has(a.text)) continue;
+      seen.add(a.text);
+      actions.push({ ...a, source: t });
+      if(actions.length >= 3) break;
+    }
+    if(actions.length >= 3) break;
+  }
+  return actions;
+}
+
+function _showProactiveBar(actions){
+  if(!actions?.length) return;
+  const wraps = [...msgsEl.querySelectorAll('.mwrap')].filter(w => w.querySelector('.mrow.agent'));
+  const lastWrap = wraps[wraps.length - 1];
+  if(!lastWrap) return;
+  lastWrap.querySelectorAll('.proactive-bar').forEach(el => el.remove());
+
+  const bar = document.createElement('div');
+  bar.className = 'proactive-bar';
+  bar.innerHTML = `<span class="proactive-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Bước tiếp theo
+  </span>`;
+  actions.forEach((a, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'proactive-chip';
+    btn.style.animationDelay = `${i * 0.06}s`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24">${a.icon}</svg><span>${esc(a.text)}</span>`;
+    btn.addEventListener('click', () => {
+      suggest(a.text, false);
+      bar.remove();
+    });
+    bar.appendChild(btn);
+  });
+  lastWrap.appendChild(bar);
+  scrollEnd(false);
 }
 
 // ══════════════════════════════════════════
