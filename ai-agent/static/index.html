@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" id="hljs-theme-link">
-  <link rel="stylesheet" href="/static/style.css?v=5">
+  <link rel="stylesheet" href="/static/style.css?v=6">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#0a0a0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,7 +27,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <!-- Gán sự kiện qua data-oculo trong app.js (hàm vẫn trên window) -->
-  <script defer src="/static/app.js?v=8"></script>
+  <script defer src="/static/app.js?v=9"></script>
 </head>
 <body data-theme="dark">
 
@@ -531,6 +531,11 @@
 
 <div id="input-area">
   <div id="agent-status-line" class="agent-status-line" hidden></div>
+  <!-- Slash Command Palette -->
+  <div id="slash-palette" class="slash-palette" hidden role="listbox" aria-label="Lệnh nhanh">
+    <div class="slash-palette-header">Lệnh nhanh · ↑↓ điều hướng · Enter chọn · Esc đóng</div>
+    <div class="slash-palette-list" id="slash-palette-list"></div>
+  </div>
   <div class="iwrap" id="iwrap">
     <div class="ibtns">
       <button type="button" class="ibtn" id="voice-btn" title="Nhập bằng giọng nói" data-oculo="toggleVoice" aria-label="Nhập bằng giọng nói">

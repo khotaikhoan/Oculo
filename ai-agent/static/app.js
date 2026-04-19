@@ -989,9 +989,16 @@ inputEl.addEventListener('input',()=>{
       localStorage.removeItem('chat_draft');
     }
   }
-  // @ mention detection
+  // Slash command palette detection — gõ / ở đầu dòng
   const val = inputEl.value;
   const pos = inputEl.selectionStart;
+  if(val.startsWith('/') && !val.includes(' ')){
+    const query = val.slice(1);
+    _openSlashPalette(query);
+  } else {
+    _closeSlashPalette();
+  }
+  // @ mention detection
   const atIdx = val.lastIndexOf('@', pos - 1);
   if(atIdx >= 0 && (atIdx === 0 || /\s/.test(val[atIdx - 1]))){
     const query = val.slice(atIdx + 1, pos);
@@ -1056,9 +1063,10 @@ if (inputEl){
       setTimeout(() => _openAtMentionPicker(), 10);
     }
 
-    // Đóng @ picker khi Escape
+    // Đóng picker khi Escape
     if(e.key === 'Escape'){
       _closeAtMentionPicker();
+      _closeSlashPalette();
     }
 
     if (!_isEnterKey(e) || e.shiftKey) return;
@@ -1857,13 +1865,141 @@ function finishCard(card, result, maskedFlag){
   };
   body.style.position = 'relative';
   body.appendChild(copyResultBtn);
-  const resultHtml = looksLikeMarkdown(result)
-    ? '<div class="tresult-label tresult-label--pad">Kết quả</div><div class="tresult-md">' + safeMarkdown(result) + '</div>'
-    : '<div class="tresult-label tresult-label--pad">Kết quả</div><div class="tresult-raw">' + esc(result) + '</div>';
-  body.insertAdjacentHTML('beforeend', resultHtml);
+
+  // ── Rich result rendering (Feature 4) ──
+  const toolName = card.querySelector('.tname')?.textContent || '';
+  body.insertAdjacentHTML('beforeend', '<div class="tresult-label tresult-label--pad">Kết quả</div>');
+  _renderRichToolResult(body, toolName, result);
+
   if(maskedFlag){
     body.insertAdjacentHTML('beforeend', '<div class="tresult-mask-note" role="status">Một phần nội dung có thể đã được ẩn (khóa API, v.v.) trước khi hiển thị</div>');
   }
+}
+
+function _tryParseJSON(str){
+  const s = (str||'').trim();
+  if(!(s.startsWith('{') || s.startsWith('[') || s.startsWith('"'))) return null;
+  try{ return JSON.parse(s); }catch{ return null; }
+}
+
+function _colorizeJSON(obj, depth){
+  if(depth === undefined) depth = 0;
+  if(depth > 6) return '<span class="jstr">…</span>';
+  if(obj === null) return '<span class="jnull">null</span>';
+  if(typeof obj === 'boolean') return '<span class="jbool">' + obj + '</span>';
+  if(typeof obj === 'number') return '<span class="jnum">' + obj + '</span>';
+  if(typeof obj === 'string') return '<span class="jstr">' + esc(JSON.stringify(obj)) + '</span>';
+  if(Array.isArray(obj)){
+    if(!obj.length) return '[]';
+    const items = obj.slice(0,12).map(v => '  '.repeat(depth+1) + _colorizeJSON(v, depth+1));
+    const tail = obj.length > 12 ? ['  '.repeat(depth+1) + '<span class="jstr">… (' + (obj.length-12) + ' more)</span>'] : [];
+    return '[\n' + [...items,...tail].join(',\n') + '\n' + '  '.repeat(depth) + ']';
+  }
+  const keys = Object.keys(obj);
+  const items = keys.slice(0,20).map(k => '  '.repeat(depth+1) + '<span class="jkey">' + esc(JSON.stringify(k)) + '</span>: ' + _colorizeJSON(obj[k], depth+1));
+  if(keys.length > 20) items.push('  '.repeat(depth+1) + '<span class="jstr">… (' + (keys.length-20) + ' more keys)</span>');
+  return '{\n' + items.join(',\n') + '\n' + '  '.repeat(depth) + '}';
+}
+
+function _renderRichToolResult(body, toolName, result){
+  const str = String(result||'');
+
+  // 1. Screenshot / base64 image — detect "data:image" or server returning path-like strings
+  const b64Match = str.match(/data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)/);
+  if(b64Match){
+    const wrap = document.createElement('div');
+    wrap.className = 'tresult-img-wrap';
+    const img = document.createElement('img');
+    img.src = b64Match[0];
+    img.alt = 'Screenshot';
+    wrap.appendChild(img);
+    wrap.addEventListener('click', ()=>{
+      const lb = document.getElementById('cu-lightbox');
+      const lbImg = document.getElementById('cu-lightbox-img');
+      if(lb && lbImg){ lbImg.src = b64Match[0]; lb.style.display='flex'; }
+    });
+    body.appendChild(wrap);
+    return;
+  }
+
+  // 2. JSON result — parse and colorize
+  const parsed = _tryParseJSON(str);
+  if(parsed !== null){
+    const pre = document.createElement('pre');
+    pre.className = 'tresult-json';
+    pre.innerHTML = _colorizeJSON(parsed);
+    body.appendChild(pre);
+    return;
+  }
+
+  // 3. Code-like file content (read_file)
+  const isFileResult = toolName === 'read_file' || toolName === 'write_file';
+  const isCodeLike = /^(import |def |function |class |#!|<!DOCTYPE|<html|package |from |const |let |var )/m.test(str.slice(0, 500));
+  if(isFileResult && isCodeLike){
+    const wrap = document.createElement('div');
+    wrap.className = 'tresult-code-preview';
+    const code = document.createElement('code');
+    const lines = str.split('\n');
+    code.textContent = lines.slice(0, 40).join('\n') + (lines.length > 40 ? '\n…' : '');
+    wrap.appendChild(code);
+    body.appendChild(wrap);
+    // Highlight if hljs available
+    if(typeof hljs !== 'undefined') try{ hljs.highlightElement(code); }catch(_){}
+    if(lines.length > 40){
+      _appendExpandBtn(body, str, wrap, code, lines);
+    }
+    return;
+  }
+
+  // 4. Long plain text — show with collapse/expand
+  if(str.length > 600){
+    const container = document.createElement('div');
+    container.className = 'tresult-raw collapsible collapsed';
+    container.textContent = str;
+    body.appendChild(container);
+    const btn = document.createElement('button');
+    btn.className = 'tresult-expand-btn';
+    btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem thêm';
+    let expanded = false;
+    btn.addEventListener('click', ()=>{
+      expanded = !expanded;
+      container.classList.toggle('collapsed', !expanded);
+      btn.innerHTML = expanded
+        ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg> Thu gọn'
+        : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem thêm';
+    });
+    body.appendChild(btn);
+    return;
+  }
+
+  // 5. Fallback — markdown or plain text
+  if(looksLikeMarkdown(str)){
+    const div = document.createElement('div');
+    div.className = 'tresult-md';
+    div.innerHTML = safeMarkdown(str);
+    body.appendChild(div);
+  } else {
+    const div = document.createElement('div');
+    div.className = 'tresult-raw';
+    div.textContent = str;
+    body.appendChild(div);
+  }
+}
+
+function _appendExpandBtn(body, fullStr, preWrap, codeEl, lines){
+  const btn = document.createElement('button');
+  btn.className = 'tresult-expand-btn';
+  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem đầy đủ (' + lines.length + ' dòng)';
+  let expanded = false;
+  btn.addEventListener('click', ()=>{
+    expanded = !expanded;
+    codeEl.textContent = expanded ? fullStr : lines.slice(0, 40).join('\n') + '\n…';
+    if(typeof hljs !== 'undefined') try{ hljs.highlightElement(codeEl); }catch(_){}
+    btn.innerHTML = expanded
+      ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg> Thu gọn'
+      : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg> Xem đầy đủ (' + lines.length + ' dòng)';
+  });
+  body.appendChild(btn);
 }
 
 // ── Tool execution timeline (một block / lượt trả lời tới khi done) ──
@@ -5079,6 +5215,121 @@ if(inputEl){
     }
   }, true); // capture để chạy trước handler Enter
 }
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE 1 — SLASH COMMAND PALETTE
+// ═══════════════════════════════════════════════════════════════
+
+const SLASH_COMMANDS = [
+  { cmd:'new',       label:'Hội thoại mới',     desc:'Tạo cuộc hội thoại mới',            icon:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',                                                    action: ()=>{ _slashDone(); newConversation(); } },
+  { cmd:'model',     label:'Đổi model',          desc:'Mở bộ chọn model AI  (⌥M)',         icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',  action: ()=>{ _slashDone(); toggleModelPicker(); } },
+  { cmd:'memory',    label:'Bộ nhớ dài hạn',     desc:'Xem và tìm kiếm bộ nhớ agent',      icon:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',                                            action: ()=>{ _slashDone(); openMemory(); } },
+  { cmd:'skills',    label:'Kỹ năng agent',       desc:'Chọn chuyên môn cho agent',         icon:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',                                                                    action: ()=>{ _slashDone(); openSkills(); } },
+  { cmd:'pipeline',  label:'Pipeline đa agent',   desc:'Nghiên cứu → Thực thi → Đánh giá', icon:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>', action: ()=>{ _slashDone(); openPipeline(); } },
+  { cmd:'settings',  label:'Cấu hình',            desc:'Chỉnh model, temperature, prompt',  icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4"/>',  action: ()=>{ _slashDone(); openSettings(); } },
+  { cmd:'clear',     label:'Xóa chat',            desc:'Xóa toàn bộ nội dung chat hiện tại',icon:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>',                                               action: ()=>{ _slashDone(); clearChat(); } },
+  { cmd:'theme',     label:'Đổi giao diện',       desc:'Chuyển đổi sáng / tối',             icon:'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',                                                                                                                   action: ()=>{ _slashDone(); toggleThemeUI(); } },
+  { cmd:'split',     label:'Split panel',         desc:'Bật/tắt chia đôi màn hình (⌥P)',   icon:'<rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/>',                                                                                        action: ()=>{ _slashDone(); toggleSplitPanel(); } },
+  { cmd:'export',    label:'Xuất hội thoại',      desc:'Lưu dưới dạng JSON',                icon:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',                                               action: ()=>{ _slashDone(); exportChat(); } },
+  { cmd:'shortcuts', label:'Phím tắt',            desc:'Xem toàn bộ phím tắt',              icon:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 2l-4 5-4-5"/>',                                                                                                     action: ()=>{ _slashDone(); openShortcuts(); } },
+  { cmd:'monitor',   label:'Giám sát',            desc:'Theo dõi file, lịch, hệ thống',     icon:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',                                                                                                                                          action: ()=>{ _slashDone(); openMonitor(); } },
+];
+
+let _slashOpen = false;
+let _slashIdx = 0;
+let _slashFiltered = [];
+
+function _slashDone(){
+  if(inputEl){ inputEl.value = ''; inputEl.dispatchEvent(new Event('input')); }
+  _closeSlashPalette();
+}
+
+function _openSlashPalette(query){
+  _slashOpen = true;
+  const el = document.getElementById('slash-palette');
+  if(el) el.hidden = false;
+  _filterSlashPalette(query);
+}
+
+function _closeSlashPalette(){
+  _slashOpen = false;
+  const el = document.getElementById('slash-palette');
+  if(el) el.hidden = true;
+}
+
+function _highlightMatch(text, query){
+  if(!query) return esc(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if(idx < 0) return esc(text);
+  return esc(text.slice(0, idx)) + '<em>' + esc(text.slice(idx, idx + query.length)) + '</em>' + esc(text.slice(idx + query.length));
+}
+
+function _filterSlashPalette(query){
+  const q = (query||'').toLowerCase().trim();
+  _slashFiltered = q
+    ? SLASH_COMMANDS.filter(c => c.cmd.includes(q) || c.label.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+    : SLASH_COMMANDS;
+  _slashIdx = 0;
+  _renderSlashPalette(q);
+}
+
+function _renderSlashPalette(query){
+  const list = document.getElementById('slash-palette-list');
+  if(!list) return;
+  if(!_slashFiltered.length){
+    list.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:var(--text-sm)">Không tìm thấy lệnh</div>';
+    return;
+  }
+  list.innerHTML = _slashFiltered.map((c, i) => `
+    <div class="slash-cmd${i === _slashIdx ? ' slash-active' : ''}" data-slash-idx="${i}" role="option" aria-selected="${i === _slashIdx}">
+      <span class="slash-cmd-icon"><svg viewBox="0 0 24 24">${c.icon}</svg></span>
+      <span class="slash-cmd-body">
+        <span class="slash-cmd-name">/${_highlightMatch(c.cmd, query)}</span>
+        <span class="slash-cmd-desc">${esc(c.label)} — ${esc(c.desc)}</span>
+      </span>
+      <span class="slash-cmd-kbd">↵</span>
+    </div>`).join('');
+
+  list.querySelectorAll('.slash-cmd').forEach((el, i) => {
+    el.addEventListener('mousedown', e => { e.preventDefault(); _slashFiltered[i]?.action?.(); });
+    el.addEventListener('mouseover', () => { _slashIdx = i; _renderSlashPalette(query); });
+  });
+
+  const active = list.querySelector('.slash-active');
+  if(active) active.scrollIntoView({ block: 'nearest' });
+}
+
+// Hook into keydown (capture phase) to intercept arrow + enter in palette
+if(inputEl){
+  inputEl.addEventListener('keydown', e => {
+    if(!_slashOpen) return;
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      _slashIdx = Math.min(_slashIdx + 1, _slashFiltered.length - 1);
+      const q = inputEl.value.slice(1);
+      _renderSlashPalette(q);
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      _slashIdx = Math.max(_slashIdx - 1, 0);
+      const q = inputEl.value.slice(1);
+      _renderSlashPalette(q);
+    } else if(e.key === 'Enter'){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      _slashFiltered[_slashIdx]?.action?.();
+    } else if(e.key === 'Escape'){
+      _closeSlashPalette();
+    }
+  }, true);
+}
+
+// Close slash palette when clicking outside
+document.addEventListener('mousedown', e => {
+  if(!_slashOpen) return;
+  const pal = document.getElementById('slash-palette');
+  const inp = document.getElementById('input-area');
+  if(pal && !pal.contains(e.target) && (!inp || !inp.contains(e.target))) _closeSlashPalette();
+}, true);
 
 function toggleMoreMenu(){
   const menu = document.getElementById('hmore-menu');
