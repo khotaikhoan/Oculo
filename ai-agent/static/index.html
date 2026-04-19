@@ -68,6 +68,7 @@
         <div class="shortcut-row"><span class="shortcut-desc">Xuống dòng</span><div class="shortcut-keys"><span class="kbd">Shift</span><span class="kbd-plus">+</span><span class="kbd">Enter</span></div></div>
         <div class="shortcut-row"><span class="shortcut-desc">Focus vào input</span><div class="shortcut-keys"><span class="kbd">/</span></div></div>
         <div class="shortcut-row"><span class="shortcut-desc">Chọn model</span><div class="shortcut-keys"><span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">M</span></div></div>
+        <div class="shortcut-row"><span class="shortcut-desc">Chia đôi màn hình (split view)</span><div class="shortcut-keys"><span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">P</span></div></div>
         <div class="shortcut-row"><span class="shortcut-desc">Hội thoại mới</span><div class="shortcut-keys"><span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">N</span></div></div>
         <div class="shortcut-row"><span class="shortcut-desc">Mở bảng phím tắt</span><div class="shortcut-keys"><span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">/</span></div></div>
       </div>
@@ -350,6 +351,11 @@
       <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
     </button>
 
+    <!-- Split panel toggle -->
+    <button type="button" class="split-panel-btn" id="split-panel-btn" data-oculo="toggleSplitPanel" title="Chia đôi màn hình — browser preview bên phải (⌥P)" aria-label="Chia đôi màn hình với browser preview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+    </button>
+
     <!-- Overflow "..." menu — chỉ giữ 5 items thường dùng -->
     <div class="hmore-wrap" id="hmore-wrap">
       <button type="button" class="hmore-btn" id="hmore-btn" data-oculo="toggleMoreMenu" title="Thêm tùy chọn" aria-label="Menu thêm tùy chọn" aria-expanded="false" aria-haspopup="true" aria-controls="hmore-menu">
@@ -547,7 +553,7 @@
       <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2" fill="#fff" stroke="none"/></svg>
     </button>
   </div>
-  <div class="hint">Enter gửi · Shift+Enter xuống dòng · / focus ô chat · <span class="hint-k" title="Xóa toàn bộ nội dung chat (có xác nhận)">⌘K</span> xóa · ⌘N mới · <span class="hint-k" title="Mở danh sách phím tắt">⌥/</span> phím tắt</div>
+  <div class="hint">Enter gửi · Shift+Enter xuống dòng · / focus · <span class="hint-k" title="Xóa toàn bộ nội dung chat (có xác nhận)">⌘K</span> xóa · ⌘N mới · <span class="hint-k" title="Chia đôi màn hình với browser preview">⌥P</span> split · <span class="hint-k" title="Mở danh sách phím tắt">⌥/</span> phím tắt</div>
 </div>
 
 <!-- Todo Panel - Cursor style -->
@@ -745,6 +751,7 @@
 
 <!-- Browser Live View Panel -->
 <div id="browser-live-panel" class="browser-live-panel" hidden aria-label="Trình duyệt đang điều khiển">
+  <div class="blp-resize-handle" id="blp-resize-handle" aria-hidden="true"></div>
   <div class="blp-header">
     <div class="blp-indicator">
       <span class="blp-dot"></span>
