@@ -144,7 +144,8 @@ def _classifier_client_model():
     try:
         import server
 
-        return server.get_client(), server.DEFAULT_MODEL
+        c = server.try_get_client()
+        return c, server.DEFAULT_MODEL
     except Exception:
         return None, os.getenv("MODEL", "claude-sonnet-4-5")
 

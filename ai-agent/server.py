@@ -48,7 +48,7 @@ from utils.error_classifier import ErrorClassifier, ErrorCategory
 from utils.retry_engine import run_with_retry
 from utils.fallback_registry import execute_fallback
 from utils.task_progress import progress_store, create_task, record_step
-from utils.api_key_manager import key_manager
+from utils.api_key_manager import key_manager, _NoKeysError
 from utils.data_masker import mask_with_flag
 from utils.model_display import model_ui_meta, model_ui_meta_openai_compat, enrich_models_list
 from utils.openai_compat import (
@@ -272,18 +272,25 @@ def get_client() -> anthropic.Anthropic:
     return _client_pool[key]
 
 
+def try_get_client() -> anthropic.Anthropic | None:
+    """Anthropic SDK khi có key (Anthropic, CHIASEGPU_*, hoặc GEMINI_* + ANTHROPIC_BASE_URL). None nếu chỉ OpenAI-compat."""
+    try:
+        return get_client()
+    except _NoKeysError:
+        return None
+
+
 def get_optional_anthropic_direct():
     """Computer Use / tính năng chỉ có trên Anthropic Messages API (beta). Không qua 9Router."""
-    k = os.getenv("ANTHROPIC_API_KEY")
+    k = (
+        (os.getenv("ANTHROPIC_API_KEY") or "").strip()
+        or (os.getenv("CHIASEGPU_API_KEY") or "").strip()
+        or (os.getenv("ANTHROPIC_DELEGATE_API_KEY") or "").strip()
+    )
     if not k:
         return None
     return anthropic.Anthropic(api_key=k, base_url=os.getenv("ANTHROPIC_BASE_URL") or None)
 
-
-try:
-    client = get_client()
-except Exception:
-    client = None  # type: ignore[assignment]  — no API key yet; routes use get_client() per-request
 
 _OLLAMA_BASE_URL = (os.getenv("OLLAMA_BASE_URL") or "http://127.0.0.1:11434").rstrip("/")
 _ollama_service_proc: subprocess.Popen | None = None
@@ -302,6 +309,49 @@ active_streams = {}
 
 DEFAULT_MODEL  = os.getenv("MODEL", "claude-sonnet-4-5")
 DEFAULT_TEMP   = 1.0
+
+
+def _try_openai_compat_completion(prompt: str, max_tokens: int) -> str:
+    """Gọi chat completions khi chỉ cấu hình GEMINI_* / OpenAI-compat (không có Anthropic SDK)."""
+    if not openai_compat_configured():
+        return ""
+    try:
+        from utils.openai_compat import get_openai_compat_client
+
+        oai = get_openai_compat_client()
+        mdl = (os.getenv("GEMINI_MODEL") or os.getenv("MODEL") or DEFAULT_MODEL or "").strip()
+        if not mdl:
+            return ""
+        resp = oai.chat.completions.create(
+            model=mdl,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
+        )
+        if not resp.choices:
+            return ""
+        msg = resp.choices[0].message
+        return (getattr(msg, "content", None) or "").strip()
+    except Exception:
+        return ""
+
+
+def _try_messages_completion(prompt: str, max_tokens: int) -> str:
+    """Ưu tiên Anthropic Messages; fallback OpenAI-compat."""
+    ac = try_get_client()
+    if ac:
+        mdl = (os.getenv("HAIKU_MODEL") or os.getenv("MODEL") or DEFAULT_MODEL).strip()
+        try:
+            r = ac.messages.create(
+                model=mdl,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return _extract_text_from_content(r.content, "").strip()
+        except Exception:
+            pass
+    return _try_openai_compat_completion(prompt, max_tokens)
+
 
 BROWSER_BEHAVIOR_PROMPT = """
 Khi thực hiện task trên Chrome, hành xử như người thật:
@@ -412,10 +462,10 @@ Do NOT give vague reports. Always include real data.
 
 # Memory consolidation every 30 minutes
 def _memory_consolidate_job():
-    try:
-        return memory_store.consolidate_old_memories(get_client())
-    except Exception:
-        pass
+    ac = try_get_client()
+    if ac is None:
+        return None
+    return memory_store.consolidate_old_memories(ac)
 
 
 scheduler.add_job(
@@ -683,23 +733,38 @@ def run_tool(name: str, inputs: dict) -> str:
         if name == "browser_macro_list":    return browser.browser_macro_list()
         if name == "browser_get_conv_context": return browser.browser_get_conv_context()
 
+        _no_msg_sdk = (
+            "Error: Thiếu key Anthropic Messages (ANTHROPIC_API_KEY, CHIASEGPU_API_KEY, "
+            "hoặc GEMINI_API_KEY kèm ANTHROPIC_BASE_URL nếu proxy dùng chung token). "
+            "Chat qua chiasegpu /v1 chỉ cần GEMINI_*; vision cần Messages API."
+        )
+
         if name == "browser_analyze_page":
+            _ac = try_get_client()
+            if not _ac:
+                return _no_msg_sdk
             return browser_analyze_page_tool(
-                get_client(),
+                _ac,
                 DEFAULT_MODEL,
                 (inputs.get("focus") or "").strip() or None,
             )
         if name == "browser_vision_click":
+            _ac = try_get_client()
+            if not _ac:
+                return _no_msg_sdk
             return browser_vision_click_tool(
-                get_client(),
+                _ac,
                 DEFAULT_MODEL,
                 str(inputs.get("target") or ""),
                 bool(inputs.get("verify", True)),
                 (inputs.get("selector") or "").strip() or None,
             )
         if name == "browser_vision_type":
+            _ac = try_get_client()
+            if not _ac:
+                return _no_msg_sdk
             return browser_vision_type_tool(
-                get_client(),
+                _ac,
                 DEFAULT_MODEL,
                 str(inputs.get("target") or ""),
                 str(inputs.get("text") or ""),
@@ -731,10 +796,14 @@ def run_tool(name: str, inputs: dict) -> str:
             task_desc = inputs.get("task", "")
             def run_scheduled():
                 try:
+                    _ac = try_get_client()
+                    if not _ac:
+                        print("Scheduled task: thiếu Anthropic Messages client (key/SDK).")
+                        return
                     msgs = [{"role": "user", "content": task_desc}]
                     max_rounds = 10
                     for _ in range(max_rounds):
-                        r = get_client().messages.create(
+                        r = _ac.messages.create(
                             model=DEFAULT_MODEL, max_tokens=2048,
                             system=DEFAULT_SYSTEM, tools=TOOLS, messages=msgs,
                         )
@@ -781,7 +850,13 @@ def run_tool(name: str, inputs: dict) -> str:
             with open(path, "rb") as f:
                 img_b64 = base64.standard_b64encode(f.read()).decode()
             q = inputs.get("question", "Describe this screen")
-            r = get_client().messages.create(
+            _ac = try_get_client()
+            if not _ac:
+                return (
+                    "Error: screenshot_and_analyze cần Anthropic Messages API "
+                    "(key như ANTHROPIC_API_KEY / CHIASEGPU_API_KEY / GEMINI_API_KEY + ANTHROPIC_BASE_URL)."
+                )
+            r = _ac.messages.create(
                 model=DEFAULT_MODEL, max_tokens=1024,
                 messages=[{"role": "user", "content": [
                     {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
@@ -805,8 +880,11 @@ def run_tool(name: str, inputs: dict) -> str:
             source = inputs.get("source", "")
             if not schema or not source:
                 return "Error: schema va source la bat buoc"
+            _ac = try_get_client()
+            if not _ac:
+                return "Error: extract_data cần Anthropic Messages API (thiếu key/SDK)."
             extract_tool = {"name": "extracted", "description": "Structured output", "input_schema": schema}
-            r = get_client().messages.create(
+            r = _ac.messages.create(
                 model=DEFAULT_MODEL, max_tokens=1024,
                 tools=[extract_tool],
                 tool_choice={"type": "tool", "name": "extracted"},
@@ -906,7 +984,10 @@ def serialize_content(blocks):
 
 
 def _anthropic_upstream_model_ids() -> list[str]:
-    ml = get_client().models.list()
+    ac = try_get_client()
+    if ac is None:
+        return []
+    ml = ac.models.list()
     return [m.id for m in ml]
 
 
@@ -960,7 +1041,6 @@ def _stream_agent_openai_compat(
 
     query = _get_query_text(user_content)
     usage_tracker = TokenUsageTracker()
-    key_manager.get_key()
 
     has_tool_history = any(
         isinstance(m.get("content"), list)
@@ -975,6 +1055,8 @@ def _stream_agent_openai_compat(
     yield f"data: {json.dumps({'type': 'model_selected', 'model': selected_model, 'complexity': routing.complexity, 'reason': routing.reason, **_mmu})}\n\n"
 
     messages_for_compress = _trim_history_tool_results(list(history) + [{"role": "user", "content": user_content}])
+
+    _ac_compat = try_get_client()
 
     def _get_prefs():
         now = time.time()
@@ -994,14 +1076,18 @@ def _stream_agent_openai_compat(
         return build_memory_context(filtered)
 
     def _compress():
-        return compress_history(messages_for_compress, get_client())
+        if _ac_compat is None:
+            return messages_for_compress, {}
+        return compress_history(messages_for_compress, _ac_compat)
 
     def _decompose():
         if not use_tools:
             return []
         if os.getenv("AGENT_SKIP_DECOMPOSE", "").lower() in ("1", "true", "yes"):
             return []
-        return decompose_task(query, get_client())
+        if _ac_compat is None:
+            return []
+        return decompose_task(query, _ac_compat)
 
     pref_prompt, prefs = "", None
     env_context = ""
@@ -1415,6 +1501,8 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
     # Trước đây: tuần tự ~4-16s. Giờ: song song ~max(từng task)
     messages_for_compress = _trim_history_tool_results(list(history) + [{"role": "user", "content": user_content}])
 
+    _ac_main = try_get_client()
+
     def _get_prefs():
         now = time.time()
         if now - _prefs_cache["ts"] < _PREFS_CACHE_TTL and _prefs_cache["obj"] is not None:
@@ -1433,14 +1521,18 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
         return build_memory_context(filtered)
 
     def _compress():
-        return compress_history(messages_for_compress, get_client())
+        if _ac_main is None:
+            return messages_for_compress, {}
+        return compress_history(messages_for_compress, _ac_main)
 
     def _decompose():
         if not use_tools:
             return []
         if os.getenv("AGENT_SKIP_DECOMPOSE", "").lower() in ("1", "true", "yes"):
             return []
-        return decompose_task(query, get_client())
+        if _ac_main is None:
+            return []
+        return decompose_task(query, _ac_main)
 
     pref_prompt, prefs = "", None
     env_context = ""
@@ -1583,7 +1675,7 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
             tool_results = []
             _blocks_by_id2 = {str(b.id): b for b in tool_blocks}
             for pr in parallel_results:
-                summarized = maybe_summarize(pr["name"], pr["result"], get_client())
+                summarized = maybe_summarize(pr["name"], pr["result"], _ac_main)
                 masked, was_masked = mask_with_flag(summarized)
                 tid = str(pr["tool_use_id"])
                 blk = _blocks_by_id2.get(tid)
@@ -1680,7 +1772,7 @@ def stream_agent(user_content, history, abort_event, model, temperature, system_
                         yield f"data: {json.dumps({**bfe, 'tool_use_id': str(block.id)})}\n\n"
 
                 # Tool summarization
-                result = maybe_summarize(block.name, result, get_client())
+                result = maybe_summarize(block.name, result, _ac_main)
 
                 # Mask sensitive data before yielding to client
                 masked_result, was_masked = mask_with_flag(result)
@@ -1959,7 +2051,11 @@ def pipeline():
 
     def generate():
         try:
-            for event in run_pipeline(task, get_client()):
+            _ac_pl = try_get_client()
+            if not _ac_pl:
+                yield f"data: {json.dumps({'stage': 'error', 'content': 'Pipeline cần Anthropic Messages API (thiếu key / ANTHROPIC_BASE_URL + token).'})}\n\n"
+                return
+            for event in run_pipeline(task, _ac_pl):
                 yield f"data: {json.dumps(event)}\n\n"
         except Exception as e:
             traceback.print_exc()
@@ -1982,7 +2078,7 @@ def computer_use():
         return jsonify({
             "error": (
                 "Computer Use cần Anthropic Messages API (beta). "
-                "Thêm ANTHROPIC_API_KEY vào .env (Messages API trực tiếp)."
+                "Thêm ANTHROPIC_API_KEY hoặc CHIASEGPU_API_KEY vào .env (Messages API / proxy)."
             ),
         }), 501
 
@@ -2026,7 +2122,10 @@ def clear_memory():
 
 @app.route("/memory/consolidate", methods=["POST"])
 def consolidate_memory():
-    result = memory_store.consolidate_old_memories(get_client())
+    _ac = try_get_client()
+    if not _ac:
+        return jsonify({"error": "Cần Anthropic Messages client để gom bộ nhớ."}), 503
+    result = memory_store.consolidate_old_memories(_ac)
     return jsonify(result)
 
 
@@ -2165,7 +2264,7 @@ def client_config():
             # Optional: where client can check for updates (JSON feed or GitHub API proxy).
             "update_feed_url": (os.getenv("OCULO_UPDATE_FEED_URL") or "").strip(),
             "downloads_url": (os.getenv("OCULO_DOWNLOADS_URL") or "").strip(),
-            "has_api_key": bool(key_manager.keys),
+            "has_api_key": bool(key_manager.keys) or openai_compat_configured(),
         }
     )
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -2250,14 +2349,8 @@ def generate_title():
         if isinstance(m.get("content"), str)
     ])
     try:
-        mdl = os.getenv("HAIKU_MODEL") or os.getenv("MODEL", DEFAULT_MODEL)
         prompt = f"Đặt tiêu đề ngắn (tối đa 5 từ) cho cuộc hội thoại này, tiếng Việt chuẩn có đầy đủ dấu: {sample}"
-        r = get_client().messages.create(
-            model=mdl,
-            max_tokens=30,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        title = _extract_text_from_content(r.content, "Cuộc hội thoại")
+        title = _try_messages_completion(prompt, 30) or "Cuộc hội thoại"
         title = title.strip().strip('"\'')
         return jsonify({"title": title[:50]})
     except Exception:
@@ -2336,8 +2429,6 @@ def suggest_followups():
     if not question:
         return jsonify({"suggestions": []})
     try:
-        mdl = os.getenv("HAIKU_MODEL") or os.getenv("MODEL", DEFAULT_MODEL)
-
         # Xây context tools để model biết đã làm gì
         tools_ctx = ""
         if tool_names:
@@ -2372,12 +2463,7 @@ def suggest_followups():
             "- Không đánh số, không bullet, không giải thích thêm\n"
             "Chỉ trả về 3 dòng gợi ý:"
         )
-        r = get_client().messages.create(
-            model=mdl,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text_out = _extract_text_from_content(r.content, "")
+        text_out = _try_messages_completion(prompt, 200)
         raw = text_out.strip().split("\n")
         lines = [l.strip(" -•–·123456789.) ") for l in raw if l.strip()]
         # Giữ prefix → nếu có

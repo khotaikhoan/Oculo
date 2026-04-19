@@ -215,21 +215,30 @@ venv/bin/playwright install chromium
 
 **3. Tạo file `.env`:**
 
-```env
-# Bắt buộc
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_BASE_URL=https://llm.chiasegpu.vn   # hoặc bỏ để dùng Anthropic trực tiếp
+**Cách A — Anthropic / proxy Messages (Claude “chuẩn” SDK):**
 
-# Model
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+# hoặc token chiasegpu Messages:
+# CHIASEGPU_API_KEY=...
+ANTHROPIC_BASE_URL=https://...   # proxy chiasegpu Messages, hoặc bỏ để api.anthropic.com
+
 MODEL=claude-sonnet-4.6
 HAIKU_MODEL=claude-haiku-4.5
-AGENT_SMART_MODEL_ROUTING=true
-
-# OpenAI-compat (tùy chọn — Gemini, GLM...)
-GEMINI_API_KEY=sk-...
-GEMINI_BASE_URL=https://llm.chiasegpu.vn/v1
-GEMINI_EXTRA_MODELS=gemini-3-flash,gemini-3.1-pro-preview
 ```
+
+**Cách B — Chỉ chiasegpu qua OpenAI-compat `/v1` (không cần `ANTHROPIC_API_KEY`):**
+
+```env
+GEMINI_API_KEY=...
+GEMINI_BASE_URL=https://llm.chiasegpu.vn/v1
+GEMINI_MODEL=claude-sonnet-4-5
+GEMINI_EXTRA_MODELS=gemini-3-flash,gemini-3.1-pro-preview
+MODEL=claude-sonnet-4-5
+AGENT_SMART_MODEL_ROUTING=true
+```
+
+*(Vision / `screenshot_and_analyze` / pipeline đa-agent vẫn cần Anthropic Messages: thêm `ANTHROPIC_BASE_URL` (endpoint Messages của proxy) cùng token — có thể dùng chung `GEMINI_API_KEY` nếu proxy hỗ trợ.)*
 
 **4. Chạy setup script (tùy chọn):**
 
@@ -241,15 +250,17 @@ bash setup.sh
 
 ## Biến môi trường
 
-Đặt trong `ai-agent/.env`. Chỉ `ANTHROPIC_API_KEY` là bắt buộc.
+Đặt trong `ai-agent/.env`. **Bắt buộc một trong hai:** (1) key Anthropic / proxy Messages, hoặc (2) `GEMINI_API_KEY` + `GEMINI_BASE_URL` (chat OpenAI-compat, vd. chiasegpu `/v1`).
 
-### Anthropic API
+### Anthropic API (Messages — Claude trực tiếp / proxy)
 
 | Biến | Mô tả | Mặc định |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | API key chính | **bắt buộc** |
+| `ANTHROPIC_API_KEY` | API key Anthropic hoặc token proxy Messages | tùy chọn nếu chỉ dùng `GEMINI_*` |
+| `CHIASEGPU_API_KEY` | Token chiasegpu (tương đương, không cần đặt tên `ANTHROPIC_*`) | tùy chọn |
 | `ANTHROPIC_API_KEY_2` ... `_5` | Key phụ để xoay vòng | tùy chọn |
-| `ANTHROPIC_BASE_URL` | Base URL tùy chỉnh (proxy) | Anthropic default |
+| `ANTHROPIC_BASE_URL` | Base URL proxy Messages (chiasegpu) | Anthropic default |
+| *(gộp token)* | Nếu proxy dùng **cùng một key** cho cả `/v1` và Messages: đặt `GEMINI_API_KEY` + `GEMINI_BASE_URL` và thêm `ANTHROPIC_BASE_URL` trỏ tới endpoint Messages — server sẽ dùng chung key cho Anthropic SDK. | |
 | `MODEL` | Model chính | `claude-sonnet-4.6` |
 | `HAIKU_MODEL` | Model nhẹ cho task đơn giản | `claude-haiku-4.5` |
 | `MODELS_EXCLUDE` | Model ẩn khỏi UI (phân cách bởi `,`) | trống |
