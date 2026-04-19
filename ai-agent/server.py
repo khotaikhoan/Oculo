@@ -409,7 +409,7 @@ Quy trình chuẩn cho mọi task web:
 KHÔNG cần browser_analyze_page cho 90% tasks thông thường.
 
 Tip tối ưu:
-- Research nhiều URL: dùng browser_parallel_fetch (song song, nhanh ~5x)
+- Research nhiều URL: dùng browser_batch_fetch (batch tuần tự một lần gọi — tiết kiệm lượt tool)
 - Form login/register: dùng browser_fill_form(data={...}) thay vì fill từng field
 - Task lặp lại: browser_macro_record → browser_macro_replay
 - Tăng tốc trang text-only: browser_set_resource_blocking(block=["image","font","media"])
@@ -568,9 +568,10 @@ TOOLS = [
         "Thuần heuristics JS, không gọi vision. Dùng ngay sau click/submit để biết kết quả."
     ),
      "input_schema": {"type": "object", "properties": {}, "required": []}},
-    {"name": "browser_parallel_fetch", "description": (
-        "Fetch nhiều URL song song — tất cả cùng lúc, nhanh hơn ~5x so với tuần tự. "
-        "Dùng cho research tasks: so sánh giá, scrape nhiều trang cùng chủ đề. "
+    {"name": "browser_batch_fetch", "description": (
+        "Fetch nhiều URL trong 1 lần gọi tool — mở tab, chạy extract_js, đóng tab, lặp cho mỗi URL. "
+        "Tiết kiệm round-trip LLM khi cần quét nhiều trang (so sánh giá, scrape cùng chủ đề). "
+        "Lưu ý: chạy tuần tự do Playwright sync không thread-safe; nhanh hơn vì không phải gọi tool nhiều lần. "
         "Trả về JSON {url: result}."
     ),
      "input_schema": {"type": "object", "properties": {
@@ -715,8 +716,8 @@ def run_tool(name: str, inputs: dict) -> str:
                 clear=bool(inputs.get("clear", False)),
             )
         if name == "browser_get_page_state": return browser.get_page_state()
-        if name == "browser_parallel_fetch":
-            return browser.browser_parallel_fetch(
+        if name in ("browser_batch_fetch", "browser_parallel_fetch"):
+            return browser.browser_batch_fetch(
                 urls=inputs.get("urls", []),
                 extract_js=inputs.get("extract_js", "document.title"),
             )
@@ -2070,6 +2071,7 @@ def computer_use():
     from computer_use.controller import run_computer_use
     data = request.get_json(silent=True) or {}
     task = data.get("task", "")
+    stream_id = data.get("stream_id") or f"cu-{int(time.time()*1000)}"
     if not task:
         return jsonify({"error": "task required"}), 400
 
@@ -2082,13 +2084,22 @@ def computer_use():
             ),
         }), 501
 
+    abort_event = threading.Event()
+    active_streams[stream_id] = abort_event
+
     def generate():
         try:
-            for event in run_computer_use(task, cu_client):
+            # Báo client biết stream_id để có thể gọi /abort/<id>
+            yield f"data: {json.dumps({'type': 'stream_id', 'id': stream_id})}\n\n"
+            for event in run_computer_use(task, cu_client, abort_event=abort_event):
                 yield f"data: {json.dumps(event)}\n\n"
+                if abort_event.is_set() and event.get("type") in ("done", "error", "interrupted"):
+                    break
         except Exception as e:
             traceback.print_exc()
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+        finally:
+            active_streams.pop(stream_id, None)
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

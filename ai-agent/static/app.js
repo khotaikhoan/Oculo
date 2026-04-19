@@ -7385,6 +7385,7 @@ function toggleTaskHistory(){
 // ── Computer Use ──
 // ══════════════════════════════════════════
 let cuAbortCtrl = null;
+let cuStreamId = null;
 let cuStep = 0;
 let cuLastScreenshot = null;
 let _cuElapsedTimer = null;
@@ -7451,7 +7452,12 @@ function clearCuLog(){
 }
 
 function abortComputerUse(){
+  // Báo server dừng TRƯỚC khi cắt SSE — nếu không server vẫn chạy hết loop
+  if(cuStreamId){
+    fetch(`/abort/${encodeURIComponent(cuStreamId)}`, { method: 'POST' }).catch(()=>{});
+  }
   if(cuAbortCtrl){ cuAbortCtrl.abort(); cuAbortCtrl=null; }
+  cuStreamId = null;
   cuSetRunning(false);
   cuSetStatus('', 'Đã dừng');
   cuAddEntry('error', CU_ICON.abort, 'Người dùng dừng');
@@ -7613,12 +7619,13 @@ async function runComputerUse(){
   const stepBadge  = document.getElementById('cu-step-badge');
 
   cuAbortCtrl = new AbortController();
+  cuStreamId = 'cu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   let lastScreenshotTs = 0;
 
   try {
     const res = await fetch('/computer-use',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({task}),
+      body: JSON.stringify({task, stream_id: cuStreamId}),
       signal: cuAbortCtrl.signal
     });
     if(!res.ok){
@@ -7643,7 +7650,24 @@ async function runComputerUse(){
         if(!line.startsWith('data: ')) continue;
         let d; try{d=JSON.parse(line.slice(6))}catch{continue}
 
-        if(d.type==='text' && d.content){
+        if(d.type==='stream_id'){
+          // Server đã confirm stream_id — đồng bộ cho chắc
+          if(d.id) cuStreamId = d.id;
+
+        } else if(d.type==='progress'){
+          // Cập nhật progress bar theo bước
+          const bar = document.getElementById('cu-progress');
+          if(bar && d.max_steps){
+            const pct = Math.min(100, Math.round((d.step / d.max_steps) * 100));
+            bar.classList.remove('indeterminate');
+            bar.style.width = pct + '%';
+          }
+
+        } else if(d.type==='interrupted'){
+          cuAddEntry('warn', CU_ICON.abort, d.content || 'Đã dừng');
+          cuSetStatus('', 'Đã dừng');
+
+        } else if(d.type==='text' && d.content){
           cuAddEntry('text', CU_ICON.text, d.content);
 
         } else if(d.type==='action'){
@@ -7686,6 +7710,7 @@ async function runComputerUse(){
   }
   cuSetRunning(false);
   cuAbortCtrl = null;
+  cuStreamId = null;
 }
 
 // ── Avatar agent: mắt — bám mục tiêu theo dt (mượt, không giật) + dao động sin liên tục ──

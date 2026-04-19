@@ -212,10 +212,13 @@ class HumanKeyboard:
             time.sleep(random.uniform(0.05, 0.15))
             page.keyboard.press("Backspace")
         # Burst-pause pattern: type 3-7 words in a burst, then pause to "think"
+        # Typo injection rate: giảm xuống 0.3% (gần với tốc độ lỗi thực tế của người đánh máy)
+        # và chỉ active cho text dài >= 20 char để tránh phá form validation ở input ngắn.
         word_count = 0
         burst_limit = random.randint(3, 7)
+        typo_rate = 0.003 if len(text) >= 20 else 0.0
         for char in text:
-            if random.random() < 0.02 and char.isalpha():
+            if typo_rate > 0 and random.random() < typo_rate and char.isalpha():
                 wrong = random.choice("qwertyuiopasdfghjklzxcvbnm")
                 page.keyboard.press(wrong)
                 time.sleep(random.uniform(0.1, 0.3))
