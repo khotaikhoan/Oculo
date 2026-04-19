@@ -3953,6 +3953,8 @@ async function send(){
     if(busy && (text || pendingFiles.length)) showToast('Đang chờ phản hồi trước đó…', 2200);
     return;
   }
+  // Request notification permission lần đầu user gửi (one-time prompt)
+  _requestNotifPermission();
   // Blur sau khi chắc chắn sẽ gửi — tránh mất focus khi gõ Enter lúc đang busy / ô trống
   inputEl.blur();
   // Fade hint bar after 3 successful sends
@@ -4251,9 +4253,16 @@ async function send(){
             fetch('/generate-title',{method:'POST',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({messages:history})})
               .then(r=>r.ok ? r.json() : null).then(d=>{
-                if(d && d.title) saveConvTitle(d.title);
+                if(!d) return;
+                if(d.title) saveConvTitle(d.title);
+                if(Array.isArray(d.tags)) saveConvTags(d.tags);
               }).catch(()=>{});
           }
+          // Desktop notification + badge khi window không focus
+          _notifyAgentDone(_lastAnswer);
+          // Proactive action suggestions (tool-based, deterministic)
+          const _proactive = _generateProactiveActions(_turnToolNames);
+          if(_proactive.length) setTimeout(()=>_showProactiveBar(_proactive), 300);
           // Hide model badge after done — giữ hiển thị, chỉ bỏ animation
           setTimeout(()=>{
             const b=document.getElementById('model-badge');
@@ -4396,6 +4405,7 @@ function loadConversations(){
     _conversations = JSON.parse(localStorage.getItem(CONV_KEY)||'[]');
   }catch(e){ _conversations=[]; }
   renderConvList();
+  renderTagFilters();
 }
 
 function saveConversations(){
@@ -4420,6 +4430,144 @@ function saveConvTitle(title){
   if(!_activeConvId) return;
   const conv = _conversations.find(c=>c.id===_activeConvId);
   if(conv){ conv.title=_cleanTitle(title); conv.updatedAt=Date.now(); saveConversations(); renderConvList(); }
+}
+
+// Smart conversation tags — lưu + render trong sidebar
+const VALID_CONV_TAGS = new Set(['code','research','automation','file-ops','analysis','casual','debug']);
+const TAG_LABELS = {
+  code:'Code', research:'Research', automation:'Automation',
+  'file-ops':'File Ops', analysis:'Analysis', casual:'Casual', debug:'Debug',
+};
+
+function saveConvTags(tags){
+  if(!_activeConvId || !Array.isArray(tags)) return;
+  const filtered = tags.map(t => String(t||'').trim().toLowerCase()).filter(t => VALID_CONV_TAGS.has(t)).slice(0, 2);
+  const conv = _conversations.find(c=>c.id===_activeConvId);
+  if(conv){ conv.tags = filtered; conv.updatedAt = Date.now(); saveConversations(); renderConvList(); renderTagFilters(); }
+}
+
+let _tagFilter = null; // null = show all
+
+function renderTagFilters(){
+  const wrap = document.getElementById('conv-tag-filters');
+  if(!wrap) return;
+  const counts = {};
+  _conversations.forEach(c => (c.tags||[]).forEach(t => { counts[t] = (counts[t]||0) + 1; }));
+  const tagList = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+  if(!tagList.length){ wrap.innerHTML = ''; return; }
+
+  const chips = [
+    `<button type="button" class="tag-filter-chip${_tagFilter === null ? ' active' : ''}" data-filter-tag="">Tất cả <span class="tag-count">${_conversations.length}</span></button>`,
+    ...tagList.map(t => `<button type="button" class="tag-filter-chip${_tagFilter === t ? ' active' : ''}" data-tag="${esc(t)}" data-filter-tag="${esc(t)}">${esc(TAG_LABELS[t] || t)} <span class="tag-count">${counts[t]}</span></button>`),
+  ];
+  wrap.innerHTML = chips.join('');
+  wrap.querySelectorAll('.tag-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const t = chip.getAttribute('data-filter-tag');
+      _tagFilter = t ? t : null;
+      renderTagFilters();
+      renderConvList();
+    });
+  });
+}
+
+// ══════════════════════════════════════════
+// ── DESKTOP NOTIFICATION + FAVICON BADGE ──
+// ══════════════════════════════════════════
+let _unreadCount = 0;
+let _windowFocused = typeof document !== 'undefined' ? document.hasFocus() : true;
+let _origFaviconHref = null;
+let _origDocTitle = null;
+
+function _initNotificationSystem(){
+  _origFaviconHref = document.getElementById('app-favicon')?.getAttribute('href') || '';
+  _origDocTitle = document.title;
+  window.addEventListener('focus', () => {
+    _windowFocused = true;
+    _unreadCount = 0;
+    document.body.classList.remove('has-unread');
+    _updateFaviconBadge();
+  });
+  window.addEventListener('blur', () => { _windowFocused = false; });
+}
+
+function _requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'default'){
+    try{ Notification.requestPermission(); }catch(_){}
+  }
+}
+
+function _notifyAgentDone(reply){
+  if(_windowFocused) return;
+  const preview = String(reply||'').replace(/\s+/g,' ').trim().slice(0, 120);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{
+      const n = new Notification('Oculo xong rồi ✓', {
+        body: preview || 'Agent đã hoàn thành tác vụ',
+        icon: _origFaviconHref || undefined,
+        tag: 'oculo-agent-done',
+        silent: false,
+      });
+      n.onclick = () => { try{ window.focus(); }catch(_){} n.close(); };
+      setTimeout(() => { try{ n.close(); }catch(_){} }, 6000);
+    }catch(_){}
+  }
+  _unreadCount++;
+  document.body.classList.add('has-unread');
+  _updateFaviconBadge();
+}
+
+function _updateFaviconBadge(){
+  const link = document.getElementById('app-favicon');
+  if(!link) return;
+  if(_unreadCount <= 0){
+    if(_origFaviconHref) link.setAttribute('href', _origFaviconHref);
+    document.title = _origDocTitle || 'Oculo';
+    return;
+  }
+  // Vẽ favicon với badge số ở góc trên phải
+  try{
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    // Nền gradient giống favicon gốc
+    const grad = ctx.createLinearGradient(0,0,64,64);
+    grad.addColorStop(0, '#7c9fff');
+    grad.addColorStop(1, '#a78bfa');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(0,0,64,64,14) : ctx.rect(0,0,64,64);
+    ctx.fill();
+    // Vẽ mắt Oculo đơn giản (vòng tròn)
+    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(32, 32, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(32, 32, 3, 0, Math.PI*2); ctx.fill();
+    // Badge đỏ góc trên phải với số
+    const badge = Math.min(_unreadCount, 99);
+    const badgeText = badge >= 99 ? '99+' : String(badge);
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.arc(50, 14, 14, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(50, 14, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px system-ui,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, 50, 15);
+    link.setAttribute('href', canvas.toDataURL('image/png'));
+  }catch(_){}
+  document.title = `(${_unreadCount}) ${_origDocTitle || 'Oculo'}`;
+}
+
+// Khởi tạo + request permission lần đầu user gửi tin
+if(typeof document !== 'undefined'){
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', _initNotificationSystem);
+  } else {
+    _initNotificationSystem();
+  }
 }
 
 function saveCurrentConv(){
@@ -4647,6 +4795,9 @@ function _convItemHTML(c){
   const editSvg  = `<svg ${S}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>`;
 
   const cid = encodeURIComponent(c.id);
+  const tagsHtml = (c.tags && c.tags.length)
+    ? `<div class="conv-tags">${c.tags.map(t => `<span class="conv-tag" data-tag="${esc(t)}">${esc(TAG_LABELS[t] || t)}</span>`).join('')}</div>`
+    : '';
   return `<div class="conv-item ${isActive?'active':''} ${isPinned?'pinned':''}"
     data-oculo="switchConversation"
     data-conv-id="${cid}"
@@ -4658,6 +4809,7 @@ function _convItemHTML(c){
         ${countBadge}
       </div>
       ${preview ? `<span class="conv-preview">${esc(preview)}</span>` : ''}
+      ${tagsHtml}
     </div>
     <div class="conv-actions">
       <button type="button" class="conv-act pin-btn" data-oculo="togglePinConv" data-conv-id="${cid}" data-oculo-stop title="${isPinned?'Bỏ ghim':'Ghim'}">
@@ -4696,8 +4848,11 @@ function renderConvList(){
     return;
   }
 
-  // Filter by search
+  // Filter by search + tag
   let convs = _conversations;
+  if(_tagFilter){
+    convs = convs.filter(c => Array.isArray(c.tags) && c.tags.includes(_tagFilter));
+  }
   if(_convSearchQuery){
     convs = convs.filter(c=>
       (c.title||'').toLowerCase().includes(_convSearchQuery) ||
@@ -6055,6 +6210,105 @@ function updateCtxMeter(inputTokens){
   pctEl.textContent = pct + '%';
   pctEl.className = 'ctx-pct' + (pct > 80 ? ' danger' : pct > 50 ? ' warn' : '');
   tokEl.textContent = `${(_ctxTokensTotal/1000).toFixed(1)}k / ${(CTX_LIMIT/1000).toFixed(0)}k`;
+}
+
+// ══════════════════════════════════════════
+// ── PROACTIVE SUGGESTIONS BAR (deterministic, tool-based) ──
+// ══════════════════════════════════════════
+const TOOL_PROACTIVE_ACTIONS = {
+  write_file: [
+    { text: 'Commit vào git', icon: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>' },
+    { text: 'Đọc lại file vừa ghi', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>' },
+    { text: 'Chạy test/lint', icon: '<polyline points="9 11 12 14 22 4"/>' },
+  ],
+  read_file: [
+    { text: 'Chỉnh sửa file này', icon: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>' },
+    { text: 'Tóm tắt nội dung ngắn', icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>' },
+    { text: 'Tìm file tương tự', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' },
+  ],
+  browser_navigate: [
+    { text: 'Chụp màn hình trang', icon: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>' },
+    { text: 'Scroll xuống & phân tích', icon: '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>' },
+    { text: 'Trích xuất dữ liệu', icon: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/>' },
+  ],
+  browser_click: [
+    { text: 'Chụp kết quả sau click', icon: '<circle cx="12" cy="13" r="4"/>' },
+    { text: 'Click element tiếp theo', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+  ],
+  browser_fill: [
+    { text: 'Submit form', icon: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>' },
+    { text: 'Chụp form sau khi điền', icon: '<circle cx="12" cy="13" r="4"/>' },
+  ],
+  run_shell: [
+    { text: 'Chạy lại lệnh', icon: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>' },
+    { text: 'Xem log đầy đủ', icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>' },
+    { text: 'Debug lỗi nếu có', icon: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' },
+  ],
+  screenshot_and_analyze: [
+    { text: 'Zoom vào vùng cụ thể', icon: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>' },
+    { text: 'Click element đang thấy', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+    { text: 'Trích xuất text (OCR)', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' },
+  ],
+  extract_data: [
+    { text: 'Lưu dữ liệu vào file', icon: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>' },
+    { text: 'Phân tích thêm dữ liệu', icon: '<path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>' },
+  ],
+  remember: [
+    { text: 'Xem toàn bộ bộ nhớ', icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>' },
+  ],
+  recall: [
+    { text: 'Lưu kết quả vào bộ nhớ', icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/>' },
+  ],
+  open_app: [
+    { text: 'Chụp màn hình app', icon: '<circle cx="12" cy="13" r="4"/>' },
+  ],
+};
+
+function _generateProactiveActions(toolNames){
+  if(!toolNames?.length) return [];
+  const actions = [];
+  const seen = new Set();
+  // Ưu tiên tool gần nhất trước
+  for(const t of [...toolNames].reverse()){
+    const lst = TOOL_PROACTIVE_ACTIONS[t];
+    if(!lst) continue;
+    for(const a of lst){
+      if(seen.has(a.text)) continue;
+      seen.add(a.text);
+      actions.push({ ...a, source: t });
+      if(actions.length >= 3) break;
+    }
+    if(actions.length >= 3) break;
+  }
+  return actions;
+}
+
+function _showProactiveBar(actions){
+  if(!actions?.length) return;
+  const wraps = [...msgsEl.querySelectorAll('.mwrap')].filter(w => w.querySelector('.mrow.agent'));
+  const lastWrap = wraps[wraps.length - 1];
+  if(!lastWrap) return;
+  lastWrap.querySelectorAll('.proactive-bar').forEach(el => el.remove());
+
+  const bar = document.createElement('div');
+  bar.className = 'proactive-bar';
+  bar.innerHTML = `<span class="proactive-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Bước tiếp theo
+  </span>`;
+  actions.forEach((a, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'proactive-chip';
+    btn.style.animationDelay = `${i * 0.06}s`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24">${a.icon}</svg><span>${esc(a.text)}</span>`;
+    btn.addEventListener('click', () => {
+      suggest(a.text, false);
+      bar.remove();
+    });
+    bar.appendChild(btn);
+  });
+  lastWrap.appendChild(bar);
+  scrollEnd(false);
 }
 
 // ══════════════════════════════════════════
