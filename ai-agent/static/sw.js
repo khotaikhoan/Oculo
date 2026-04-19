@@ -1,7 +1,7 @@
 // Service Worker — AI Agent PWA
 // Cache static assets for instant load on repeat visits
 
-const CACHE = 'ai-agent-v33';
+const CACHE = 'ai-agent-v34';
 
 // Network-first cho JS/CSS versioned (có ?v=) để luôn nhận bản mới nhất
 // Cache-first chỉ cho font/CDN ít thay đổi
