@@ -582,6 +582,51 @@ def _load_storage_state_path() -> str | None:
         return str(STORAGE_PATH)
     return None
 
+
+def _apply_storage_state_to_cdp_context(ctx) -> None:
+    """Inject cookies + localStorage từ storage_state vào CDP context (vì attach CDP không nhận arg storage_state).
+    Giúp giữ login khi watchdog reconnect hoặc restart server."""
+    if not STORAGE_PATH.exists():
+        return
+    try:
+        import json as _json
+        with open(STORAGE_PATH, "r", encoding="utf-8") as f:
+            state = _json.load(f)
+    except Exception:
+        return
+    # Cookies — Playwright chấp nhận trực tiếp format {name, value, domain, ...}
+    cookies = state.get("cookies") or []
+    if cookies:
+        try:
+            ctx.add_cookies(cookies)
+        except Exception as e:
+            print(f"[Browser] Không inject được cookies vào CDP context: {e}")
+    # localStorage — chỉ inject khi có page hiện đang mở origin tương ứng (tránh mở hàng loạt tab)
+    origins = state.get("origins") or []
+    if origins and ctx.pages:
+        try:
+            for origin in origins:
+                origin_url = origin.get("origin")
+                kvs = origin.get("localStorage") or []
+                if not origin_url or not kvs:
+                    continue
+                for p in ctx.pages:
+                    try:
+                        if p.url.startswith(origin_url):
+                            for kv in kvs:
+                                k, v = kv.get("name"), kv.get("value")
+                                if k is None or v is None:
+                                    continue
+                                p.evaluate(
+                                    "({k,v}) => localStorage.setItem(k, v)",
+                                    {"k": k, "v": v},
+                                )
+                            break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
 def _find_chrome_binary():
     candidates = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -709,13 +754,31 @@ def _get_page():
         if _current_page is not None:
             try:
                 _current_page.title()
+                # Verify page vẫn attached vào _context (tránh stale reference)
+                try:
+                    if _context is not None and _current_page.context != _context:
+                        raise RuntimeError("page detached from tracked context")
+                except Exception:
+                    raise
                 return _current_page
             except Exception:
+                # Đóng gracefully tất cả pages trong context cũ trước khi reset tracking,
+                # tránh leak handle khi reconnect (nhất là sau crash/watchdog restart).
+                old_ctx = _context
                 _current_page = None
                 _pages = []
                 _context = None
                 _playwright_persistent_launched = False
                 _init_scripts_applied_to = None
+                if old_ctx is not None:
+                    try:
+                        for _p in list(old_ctx.pages):
+                            try:
+                                _p.close()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
 
     if _pw is None:
         _pw = sync_playwright().start()
@@ -762,6 +825,8 @@ def _get_page():
                     _current_page = page
                     _pages = list(ctx.pages) or [page]
                     _apply_anti_detection_init(ctx)
+                    # Inject cookies/localStorage từ session trước (quan trọng sau watchdog reconnect)
+                    _apply_storage_state_to_cdp_context(ctx)
                     _register_dialog_handler(_current_page)
                     try:
                         vp = _viewport()
@@ -982,8 +1047,17 @@ def switch_tab(tab_id: int) -> str:
     if tab_id < 0 or tab_id >= len(_pages):
         return f"Error: tab_id {tab_id} không tồn tại (có {len(_pages)} tabs)"
     try:
-        _pages[tab_id].title()  # check alive
-        _current_page = _pages[tab_id]
+        candidate = _pages[tab_id]
+        candidate.title()  # check alive
+        # Verify page vẫn attached vào context hiện tại (CDP có thể đã tái sử dụng tab)
+        if _context is not None and candidate.context != _context:
+            # Rebuild _pages từ context thực tế rồi thử lại
+            _pages[:] = list(_context.pages)
+            if tab_id >= len(_pages):
+                return f"Error: tab {tab_id} không còn tồn tại trong context (chỉ có {len(_pages)} tabs)"
+            candidate = _pages[tab_id]
+            candidate.title()
+        _current_page = candidate
         _current_page.bring_to_front()
         return f"Switched to tab {tab_id}: {_current_page.url}"
     except Exception as e:
@@ -1154,12 +1228,14 @@ def click_selector(selector: str | None = None, text: str | None = None) -> str:
             if result:
                 return result
 
-        # Strategy 3: role-based (button/link có text)
+        # Strategy 3: role-based (button/link có text) — loại bỏ disabled element
         if txt:
             for role in ("button", "link", "menuitem", "tab", "option"):
                 try:
-                    loc = page.get_by_role(role, name=txt)
-                    if loc.count() > 0:
+                    loc = page.get_by_role(role, name=txt).filter(
+                        has_not=page.locator('[aria-disabled="true"], [disabled]')
+                    )
+                    if _locator_ready(loc, 800):
                         result = _try_click_element(page, loc.first, f"role={role} name={txt!r}")
                         if result:
                             return result
@@ -1171,8 +1247,19 @@ def click_selector(selector: str | None = None, text: str | None = None) -> str:
             for attr in ("aria-label", "placeholder", "title", "alt"):
                 try:
                     loc = page.locator(f"[{attr}*='{txt}' i]")
-                    if loc.count() > 0:
+                    if _locator_ready(loc, 600):
                         result = _try_click_element(page, loc.first, f"[{attr}~={txt!r}]")
+                        if result:
+                            return result
+                except Exception:
+                    continue
+
+        # Strategy 4b: iframe / shadow DOM — nhiều site (Stripe, reCAPTCHA, YouTube embed) để button trong iframe
+        if sel or txt:
+            for label, iloc in _iframe_locators(page, sel, txt):
+                try:
+                    if _locator_ready(iloc, 600):
+                        result = _try_click_element(page, iloc.first, label)
                         if result:
                             return result
                 except Exception:
@@ -1497,12 +1584,23 @@ def browser_fill_form(data: dict) -> str:
         filled_this = False
         for loc in locators_to_try:
             try:
-                if loc.count() > 0:
+                if _locator_ready(loc, 500):
                     el = loc.first
                     el.scroll_into_view_if_needed(timeout=3000)
                     sensitive = key_lower in ("password", "passwd", "pass", "pwd", "secret", "token")
                     if sensitive:
                         el.click(timeout=5000)
+                        # Clear field trước khi gõ (tránh append vào text có sẵn)
+                        try:
+                            el.fill("", timeout=2000)
+                            if el.input_value() != "":
+                                # Fallback: select-all + delete
+                                import platform as _p
+                                mod = "Meta" if _p.system() == "Darwin" else "Control"
+                                page.keyboard.press(f"{mod}+A")
+                                page.keyboard.press("Backspace")
+                        except Exception:
+                            pass
                         page.keyboard.type(str(value), delay=random.uniform(40, 80))
                     else:
                         el.fill(str(value))
@@ -1820,6 +1918,36 @@ _VALID_MACRO_ACTIONS = {
     "navigate", "click", "fill", "scroll", "evaluate", "new_tab", "switch_tab",
     "close_tab", "screenshot", "wait", "keyboard_press",
 }
+
+
+def _locator_ready(loc, timeout_ms: int = 800) -> bool:
+    """Chờ locator attach vào DOM rồi mới trả về True.
+    Thay thế pattern `loc.count() > 0` (race khi DOM còn đang render)."""
+    try:
+        loc.first.wait_for(state="attached", timeout=timeout_ms)
+        return True
+    except Exception:
+        return False
+
+
+def _iframe_locators(page, selector: str | None = None, text: str | None = None):
+    """Trả về list locator trong tất cả iframe có thể pierce được.
+    Thử frame_locator cho mỗi iframe hiển thị; bỏ qua cross-origin frame."""
+    frame_locators = []
+    try:
+        frame_count = page.locator("iframe").count()
+    except Exception:
+        return frame_locators
+    for i in range(min(frame_count, 8)):
+        try:
+            fl = page.frame_locator(f"iframe >> nth={i}")
+            if selector:
+                frame_locators.append((f"iframe[{i}] {selector}", fl.locator(selector)))
+            if text:
+                frame_locators.append((f"iframe[{i}] text={text!r}", fl.get_by_text(text, exact=False)))
+        except Exception:
+            continue
+    return frame_locators
 
 
 def _record_macro_step(action: str, **kwargs) -> None:
