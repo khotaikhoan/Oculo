@@ -70,9 +70,35 @@ _session_fingerprint: dict = {}
 
 
 def _get_session_fingerprint() -> dict:
+    """Giữ fingerprint ổn định qua restart — persist vào file trong app_data.
+    Tránh đổi screen resolution mỗi lần restart server (detect được nếu site log lịch sử)."""
     global _session_fingerprint
-    if not _session_fingerprint:
-        _session_fingerprint = random.choice(SCREEN_PROFILES).copy()
+    if _session_fingerprint:
+        return _session_fingerprint
+    fp_path = _app_data_dir("browser_data") / "fingerprint.json"
+    try:
+        if fp_path.exists():
+            import json as _json
+            with open(fp_path, "r", encoding="utf-8") as f:
+                loaded = _json.load(f)
+                if isinstance(loaded, dict) and all(k in loaded for k in ("width", "height", "dpr")):
+                    _session_fingerprint = {
+                        "width": int(loaded["width"]),
+                        "height": int(loaded["height"]),
+                        "dpr": int(loaded["dpr"]),
+                    }
+                    return _session_fingerprint
+    except Exception:
+        pass
+    # Chưa có file → random 1 lần rồi lưu
+    _session_fingerprint = random.choice(SCREEN_PROFILES).copy()
+    try:
+        fp_path.parent.mkdir(parents=True, exist_ok=True)
+        import json as _json
+        with open(fp_path, "w", encoding="utf-8") as f:
+            _json.dump(_session_fingerprint, f)
+    except Exception:
+        pass
     return _session_fingerprint
 
 
@@ -212,10 +238,19 @@ def _page_intent_gate(page) -> str | None:
         except Exception:
             pass
 
+        # Include pathname + hash để SPA navigation (History API pushState) invalidate cache
+        # Mặc dù location.href đã gồm hash, một số SPA dùng History state mà không đổi href,
+        # nên ta kết hợp thêm document.title làm signal nhận dạng trang.
+        try:
+            spa_sig = page.evaluate("() => (document.title || '') + '|' + (location.pathname || '') + '|' + (location.hash || '')") or ""
+        except Exception:
+            spa_sig = ""
+        gate_key = f"{purl}#{spa_sig}"
+
         now = time.time()
-        # Fast-skip: cùng URL và không quá _GATE_SAME_URL_TTL giây → bỏ qua gate
+        # Fast-skip: cùng URL + SPA signature, không quá _GATE_SAME_URL_TTL giây → bỏ qua gate
         with _intent_cache_lock:
-            if purl and purl == _last_gate_url and (now - _last_gate_ts) < _GATE_SAME_URL_TTL:
+            if gate_key and gate_key == _last_gate_url and (now - _last_gate_ts) < _GATE_SAME_URL_TTL:
                 return None
 
         # Cache lookup: lấy 500 ký tự đầu body text làm key nhanh
@@ -234,7 +269,7 @@ def _page_intent_gate(page) -> str | None:
                 result = should_block_action(cr, purl)
                 if result is None:
                     with _intent_cache_lock:
-                        _last_gate_url = purl
+                        _last_gate_url = gate_key
                         _last_gate_ts = now
                 return result
 
@@ -263,8 +298,9 @@ def _page_intent_gate(page) -> str | None:
             _emit_notable_intent(cr2)
             return should_block_action(cr2, purl)
 
-        _last_gate_url = purl
-        _last_gate_ts = now
+        with _intent_cache_lock:
+            _last_gate_url = gate_key
+            _last_gate_ts = now
         return None
     except Exception:
         return None
@@ -432,15 +468,12 @@ ANTI_DETECTION_INIT = """
     };
   } catch (e) {}
 
-  // Screen properties — macOS Retina 1440×900
+  // Screen color depth only — width/height/dpr set dynamically via screen_override (per-session)
+  // Tránh race: nếu để cứng 1440×900 ở đây, site đọc trong cùng microtask có thể thấy 2 giá trị khác nhau
+  // vì screen_override chạy sau ở init script kế tiếp.
   try {
-    Object.defineProperty(screen, 'width',       { get: () => 1440, configurable: true });
-    Object.defineProperty(screen, 'height',      { get: () => 900,  configurable: true });
-    Object.defineProperty(screen, 'availWidth',  { get: () => 1440, configurable: true });
-    Object.defineProperty(screen, 'availHeight', { get: () => 900,  configurable: true });
-    Object.defineProperty(screen, 'colorDepth',  { get: () => 24,   configurable: true });
-    Object.defineProperty(screen, 'pixelDepth',  { get: () => 24,   configurable: true });
-    Object.defineProperty(window, 'devicePixelRatio', { get: () => 2, configurable: true });
+    Object.defineProperty(screen, 'colorDepth',  { get: () => 24, configurable: true });
+    Object.defineProperty(screen, 'pixelDepth',  { get: () => 24, configurable: true });
   } catch (e) {}
 
   // Spoof connection as fast WiFi
@@ -491,7 +524,9 @@ def _watchdog_loop() -> None:
             page = _current_page
             if page is None:
                 continue
-            page.evaluate("1")
+            # wait_for_function có timeout thật sự (evaluate() mặc định 30s),
+            # phát hiện JS engine treo nhanh hơn để trigger reconnect
+            page.wait_for_function("1", timeout=3000)
         except Exception:
             print("[Browser watchdog] Phát hiện browser crash — đang reconnect...")
             with _browser_launch_lock:
@@ -548,16 +583,27 @@ def _register_dialog_handler(page) -> None:
     def _on_dialog(dialog) -> None:
         dtype = dialog.type  # "alert" | "confirm" | "prompt" | "beforeunload"
         msg = (dialog.message or "")[:200]
-        try:
-            if dtype in ("alert", "confirm", "beforeunload"):
-                dialog.accept()
-            else:
-                dialog.dismiss()
-        except Exception:
-            pass
+        # Retry accept/dismiss — đôi khi cleanup trên trang làm accept() fail lần đầu
+        handled = False
+        for _attempt in range(3):
+            try:
+                if dtype in ("alert", "confirm", "beforeunload"):
+                    dialog.accept()
+                elif dtype == "prompt":
+                    # Prompt cần default text, accept với empty là an toàn
+                    dialog.accept("")
+                else:
+                    dialog.dismiss()
+                handled = True
+                break
+            except Exception:
+                time.sleep(0.15)
+        # Sleep ngắn sau khi handle để chắc chắn dialog thực sự đóng trước action kế tiếp
+        if handled:
+            time.sleep(0.12)
         push_page_intent_event({
             "intent": "dialog",
-            "message": f"[{dtype}] {msg}",
+            "message": f"[{dtype}] {msg}" + ("" if handled else " (handle FAILED)"),
             "suggested_action": "proceed",
             "confidence": 1.0,
             "used_vision": False,
@@ -819,6 +865,21 @@ def _get_page():
                                     p.close()
                                 except Exception:
                                     pass
+                        pages = ctx.pages
+                    # Giới hạn số tab sau reconnect — tránh leak tích lũy qua nhiều crash/restart
+                    # Mặc định giữ tối đa 5 tab gần nhất; set CHROME_MAX_TABS_ON_RECONNECT=0 để tắt
+                    try:
+                        max_keep = int(os.getenv("CHROME_MAX_TABS_ON_RECONNECT", "5") or 5)
+                    except Exception:
+                        max_keep = 5
+                    if max_keep > 0 and len(pages) > max_keep:
+                        # Giữ `max_keep` tab cuối (thường là active gần đây), close các tab cũ hơn
+                        to_close = list(pages[:-max_keep])
+                        for p in to_close:
+                            try:
+                                p.close()
+                            except Exception:
+                                pass
                         pages = ctx.pages
                     page = pages[0] if pages else ctx.new_page()
                     _context = ctx
@@ -1318,19 +1379,31 @@ def fill(selector: str, value: str, sensitive: bool = False) -> str:
             locator = page.locator(selector).first
             locator.click(timeout=10000)
             time.sleep(random.uniform(0.1, 0.2))
-            # Clear field trước khi gõ (tránh append vào text có sẵn)
-            try:
-                locator.fill("", timeout=3000)
-            except Exception:
-                # Fallback: select-all + delete
+            # Clear field + verify empty với retry — tránh prepend password vào text cũ
+            cleared_ok = False
+            for attempt in range(3):
                 try:
-                    import platform as _p
-                    modifier = "Meta" if _p.system() == "Darwin" else "Control"
-                    page.keyboard.press(f"{modifier}+A")
-                    time.sleep(0.05)
-                    page.keyboard.press("Backspace")
+                    locator.fill("", timeout=2000)
                 except Exception:
-                    pass
+                    # Fallback: select-all + delete
+                    try:
+                        import platform as _p
+                        modifier = "Meta" if _p.system() == "Darwin" else "Control"
+                        page.keyboard.press(f"{modifier}+A")
+                        time.sleep(0.05)
+                        page.keyboard.press("Backspace")
+                    except Exception:
+                        pass
+                try:
+                    current = locator.input_value(timeout=1500)
+                except Exception:
+                    current = ""
+                if current == "":
+                    cleared_ok = True
+                    break
+                time.sleep(0.1)
+            if not cleared_ok:
+                return f"Error filling {selector}: không clear được field trước khi nhập, dừng để tránh rò rỉ dữ liệu nhạy cảm"
             page.keyboard.type(value, delay=random.uniform(50, 100))
         else:
             HumanKeyboard.type_text(page, selector, value, clear_first=True)
@@ -1383,22 +1456,38 @@ def browser_wait_for_human(condition: str, timeout_ms: int = 10000) -> str:
     except BrowserCDPError as e:
         return f"Error: {e}"
     try:
+        timed_out = False
         if condition == "network_idle":
-            page.wait_for_load_state("networkidle", timeout=timeout_ms)
+            try:
+                page.wait_for_load_state("networkidle", timeout=timeout_ms)
+            except Exception:
+                timed_out = True
         elif condition == "navigation":
-            page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+            except Exception:
+                timed_out = True
         else:
             deadline = time.monotonic() + timeout_ms / 1000.0
+            found = False
             while time.monotonic() < deadline:
                 try:
                     page.wait_for_selector(condition, timeout=1000)
+                    found = True
                     break
                 except Exception:
                     time.sleep(random.uniform(0.3, 0.8))
-            else:
+            if not found:
                 return f"Error: timeout waiting for selector {condition}"
         HumanTiming.after_navigate()
-        return f"Waited for: {condition}"
+        # Trả actual readyState để Claude biết wait có thực sự đạt điều kiện hay chỉ timeout
+        try:
+            actual = page.evaluate("document.readyState")
+        except Exception:
+            actual = "unknown"
+        if timed_out:
+            return f"Waited for: {condition} — timed out sau {timeout_ms}ms, document.readyState={actual}"
+        return f"Waited for: {condition} (readyState={actual})"
     except Exception as e:
         return f"Error browser_wait_for_human: {e}"
 
@@ -1985,8 +2074,31 @@ def browser_verify_action(
             hasError: !!document.querySelector('.error,.alert-danger,[class*=error],[role=alert]'),
         }))()"""
         before = page.evaluate(before_js)
-        time.sleep(timeout_ms / 1000.0)
-        after = page.evaluate(before_js)
+        expected_lower = expected.lower()
+
+        # Poll state mỗi 150ms thay vì sleep full timeout — phát hiện nhanh hơn
+        poll_ms = 150
+        elapsed_ms = 0
+        after = before
+        while elapsed_ms < timeout_ms:
+            time.sleep(poll_ms / 1000.0)
+            elapsed_ms += poll_ms
+            try:
+                after = page.evaluate(before_js)
+            except Exception:
+                break
+            # Kiểm tra nếu condition expected đã đạt → exit sớm
+            url_changed = before["url"] != after["url"]
+            form_disappeared = before["hasForm"] and not after["hasForm"]
+            alert_appeared = len(after["alerts"]) > len(before["alerts"])
+            has_success = after["hasSuccess"]
+            has_error = after["hasError"]
+            if expected_lower == "url_changed" and url_changed: break
+            if expected_lower == "form_disappeared" and form_disappeared: break
+            if expected_lower == "alert_appeared" and alert_appeared: break
+            if expected_lower == "success" and (has_success or url_changed or form_disappeared): break
+            if expected_lower == "error" and has_error: break
+            if expected_lower == "any_change" and (url_changed or form_disappeared or alert_appeared or has_success or has_error): break
 
         results = {}
         url_changed = before["url"] != after["url"]
@@ -1995,7 +2107,6 @@ def browser_verify_action(
         has_success = after["hasSuccess"]
         has_error = after["hasError"]
 
-        expected_lower = expected.lower()
         if expected_lower == "url_changed":
             ok = url_changed
         elif expected_lower == "form_disappeared":
