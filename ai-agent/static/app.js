@@ -1009,6 +1009,8 @@ inputEl.addEventListener('input',()=>{
   }
   // #2 Character count
   _updateCharCount();
+  // Input Temperature Meter — viền đổi màu theo độ dài
+  _applyInputTemperature();
   // #3 Send button glow khi có content
   const hasContent = inputEl.value.trim().length > 0;
   sendBtn.classList.toggle('has-content', hasContent);
@@ -4000,7 +4002,7 @@ async function send(){
   // Remove stale follow-ups from previous turn
   document.querySelectorAll('.followup-wrap,.continue-wrap').forEach(el=>el.remove());
 
-  let reply='',_turnCollapsibles=[],_turnToolNames=[],turnToolCalls=[],turnToolResults=[];
+  let reply='',_turnCollapsibles=[],_turnToolNames=[],turnToolCalls=[],turnToolResults=[],_turnErrorCount=0;
   let undoToastDismissed = false;
   const activityStreamId = currentStreamId;
   execResetBlockState();
@@ -4092,6 +4094,10 @@ async function send(){
               content: d.result != null ? String(d.result) : (d.content != null ? String(d.content) : '')
             });
           }catch{}
+          // Track tool errors cho success pulse + calm mode decision
+          const _resultText = d.result != null ? String(d.result) : (d.content != null ? String(d.content) : '');
+          const _isErr = typeof d.is_error === 'boolean' ? d.is_error : _toolResultLooksLikeError(_resultText);
+          if(_isErr){ _turnErrorCount++; _recordError(); }
           const masked = !!d.masked;
           execApplyToolResult({ ...d, masked });
           curBubble=null;
@@ -4260,6 +4266,14 @@ async function send(){
           }
           // Desktop notification + badge khi window không focus
           _notifyAgentDone(_lastAnswer);
+          // Success pulse — task phức tạp xong không lỗi
+          if(_turnToolNames.length >= 5 && _turnErrorCount === 0){
+            _triggerSuccessPulse(_turnToolNames.length);
+          }
+          // Exit calm mode khi có 1 lượt thành công sau lỗi
+          if(_calmModeActive && _turnErrorCount === 0 && reply.length > 20){
+            _exitCalmMode();
+          }
           // Proactive action suggestions (tool-based, deterministic)
           const _proactive = _generateProactiveActions(_turnToolNames);
           if(_proactive.length) setTimeout(()=>_showProactiveBar(_proactive), 300);
@@ -4296,6 +4310,7 @@ async function send(){
           AmbientWidget.onStreamError(d.content);
           execFinalizeBlock();
           showChatError(d.content,text,reply);
+          _recordError();
           sseFatal=true;
           break;
         }
@@ -6213,7 +6228,66 @@ function updateCtxMeter(inputTokens){
 }
 
 // ══════════════════════════════════════════
-// ── PROACTIVE SUGGESTIONS BAR (deterministic, tool-based) ──
+// ── ADAPTIVE COLOR BEHAVIOR ──
+// Success Pulse + Error Recovery Palette + Input Temperature
+// ══════════════════════════════════════════
+const _recentErrorsTs = []; // timestamps of recent errors
+const ERROR_WINDOW_MS = 60_000;  // 60s window
+const ERROR_THRESHOLD = 2;        // 2 errors → calm mode
+let _calmModeActive = false;
+
+function _recordError(){
+  const now = Date.now();
+  _recentErrorsTs.push(now);
+  // Keep only errors within window
+  while(_recentErrorsTs.length && now - _recentErrorsTs[0] > ERROR_WINDOW_MS){
+    _recentErrorsTs.shift();
+  }
+  if(_recentErrorsTs.length >= ERROR_THRESHOLD && !_calmModeActive){
+    _enterCalmMode();
+  }
+}
+
+function _enterCalmMode(){
+  _calmModeActive = true;
+  document.body.classList.add('calm-mode');
+  // Show subtle hint
+  try{ showToast('Đã chuyển sang chế độ êm dịu sau vài lỗi — sẽ tự khôi phục khi chạy ổn lại', 4200); }catch(_){}
+}
+
+function _exitCalmMode(){
+  if(!_calmModeActive) return;
+  _calmModeActive = false;
+  document.body.classList.remove('calm-mode');
+  _recentErrorsTs.length = 0;
+}
+
+function _triggerSuccessPulse(toolCount){
+  // Flash pulse khi task phức tạp xong không lỗi
+  document.body.classList.remove('success-pulse');
+  // Force reflow để animation restart
+  void document.body.offsetWidth;
+  document.body.classList.add('success-pulse');
+  const duration = Math.min(1400, 800 + toolCount * 50);
+  setTimeout(() => document.body.classList.remove('success-pulse'), duration);
+}
+
+// Input Temperature Meter — cập nhật màu viền theo độ dài input
+function _applyInputTemperature(){
+  const wrap = document.getElementById('iwrap');
+  if(!wrap || !inputEl) return;
+  const len = inputEl.value.length;
+  let temp;
+  if(len === 0) temp = '';
+  else if(len < 50) temp = 'cold';
+  else if(len < 300) temp = 'cool';
+  else if(len < 1000) temp = 'warm';
+  else temp = 'hot';
+  if(temp) wrap.setAttribute('data-input-temp', temp);
+  else wrap.removeAttribute('data-input-temp');
+}
+
+
 // ══════════════════════════════════════════
 const TOOL_PROACTIVE_ACTIONS = {
   write_file: [

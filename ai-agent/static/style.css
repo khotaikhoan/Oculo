@@ -4714,3 +4714,166 @@ body.has-unread .agent-eye-avatar::after{
   0%,100%{transform:scale(1);opacity:1}
   50%{transform:scale(1.15);opacity:.75}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ADAPTIVE COLOR BEHAVIOR
+   Success Pulse · Error Recovery Palette · Input Temperature
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Success Pulse ── */
+/* Khi task phức tạp xong không lỗi (>=5 tools) — flash emerald */
+@keyframes success-border-flash{
+  0%{box-shadow:inset 0 0 0 0 rgba(16,185,129,0)}
+  20%{box-shadow:inset 0 0 0 2px rgba(16,185,129,.65),0 0 28px rgba(16,185,129,.35)}
+  100%{box-shadow:inset 0 0 0 0 rgba(16,185,129,0)}
+}
+@keyframes success-ring-emit{
+  0%{transform:scale(.6);opacity:0}
+  10%{opacity:.9}
+  100%{transform:scale(1.4);opacity:0}
+}
+body.success-pulse::before{
+  content:'';
+  position:fixed;inset:0;
+  pointer-events:none;z-index:9999;
+  animation:success-border-flash 1200ms cubic-bezier(.22,1,.36,1);
+}
+body.success-pulse::after{
+  content:'✓';
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:64px;line-height:1;color:#10b981;
+  text-shadow:0 0 32px rgba(16,185,129,.7);
+  pointer-events:none;z-index:9998;
+  animation:success-check-pop 900ms cubic-bezier(.34,1.56,.64,1) forwards;
+}
+@keyframes success-check-pop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+  40%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.3)}
+}
+/* Agent avatar glow when success */
+body.success-pulse .agent-eye-avatar{
+  animation:success-orb-glow 1200ms ease-out;
+}
+@keyframes success-orb-glow{
+  0%{filter:drop-shadow(0 0 0 rgba(16,185,129,0))}
+  30%{filter:drop-shadow(0 0 16px rgba(16,185,129,.85))}
+  100%{filter:drop-shadow(0 0 0 rgba(16,185,129,0))}
+}
+
+/* ── Error Recovery Palette (Calm Mode) ── */
+/* Accent tự đổi từ blue → soft teal, red → amber để giảm căng thẳng */
+body.calm-mode{
+  transition:background-color .6s ease,color .6s ease;
+}
+body.calm-mode{
+  --accent: #5eead4;
+  --accent-rgb: 94,234,212;
+  --accent-dim: rgba(94,234,212,.14);
+  --interactive-default: #5eead4;
+  --interactive-hover: #2dd4bf;
+  --red: #f59e0b;
+  --red-rgb: 245,158,11;
+}
+body.calm-mode .chat-error-bubble{
+  background:rgba(245,158,11,.08) !important;
+  border-color:rgba(245,158,11,.35) !important;
+  color:var(--text) !important;
+}
+body.calm-mode .chat-error-text{color:#d97706 !important}
+body.calm-mode .btn-retry{
+  background:#f59e0b !important;color:#000 !important;
+}
+body.calm-mode .ambient-bg{
+  background-image:
+    radial-gradient(ellipse 70% 55% at 10% 5%,  rgba(94,234,212,.14) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 50% at 90% 95%, rgba(251,191,36,.08) 0%, transparent 65%) !important;
+}
+/* Subtle indicator trong header khi ở calm mode */
+body.calm-mode header::after{
+  content:'· chế độ êm dịu';
+  position:absolute;right:14px;bottom:-14px;
+  font-size:9px;color:#5eead4;
+  text-transform:uppercase;letter-spacing:.08em;
+  font-weight:600;pointer-events:none;
+  opacity:.75;
+  animation:calm-fade-in .5s ease;
+}
+@keyframes calm-fade-in{
+  from{opacity:0;transform:translateY(-3px)}
+  to{opacity:.75;transform:translateY(0)}
+}
+
+/* ── Input Temperature Meter ── */
+/* Viền textarea đổi màu theo độ dài input — gradient left→right */
+.iwrap{
+  transition:border-color .35s ease,box-shadow .35s ease;
+  position:relative;
+}
+.iwrap::before{
+  content:'';
+  position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:currentColor;opacity:0;border-radius:0 0 var(--r-lg,12px) var(--r-lg,12px);
+  transition:opacity .4s ease,background .35s ease;
+  pointer-events:none;
+}
+.iwrap[data-input-temp="cold"]{
+  border-color:rgba(96,165,250,.45);
+  color:#60a5fa;
+}
+.iwrap[data-input-temp="cold"]::before{
+  background:linear-gradient(90deg,#60a5fa 0%,#60a5fa 30%,transparent 100%);opacity:.55;
+}
+.iwrap[data-input-temp="cool"]{
+  border-color:rgba(148,163,184,.55);
+  color:#94a3b8;
+}
+.iwrap[data-input-temp="cool"]::before{
+  background:linear-gradient(90deg,#94a3b8 0%,#94a3b8 60%,transparent 100%);opacity:.55;
+}
+.iwrap[data-input-temp="warm"]{
+  border-color:rgba(251,191,36,.6);
+  color:#fbbf24;
+}
+.iwrap[data-input-temp="warm"]::before{
+  background:linear-gradient(90deg,#fbbf24 0%,#fbbf24 85%,transparent 100%);opacity:.7;
+  animation:temp-shimmer 2s linear infinite;
+}
+.iwrap[data-input-temp="hot"]{
+  border-color:rgba(249,115,22,.75);
+  color:#f97316;
+  box-shadow:0 0 20px rgba(249,115,22,.12);
+}
+.iwrap[data-input-temp="hot"]::before{
+  background:linear-gradient(90deg,#f97316 0%,#ef4444 100%);opacity:.85;
+  animation:temp-shimmer 1.2s linear infinite;
+}
+@keyframes temp-shimmer{
+  0%{filter:brightness(1)}
+  50%{filter:brightness(1.25)}
+  100%{filter:brightness(1)}
+}
+
+/* Temp badge ở góc phải textarea */
+.iwrap[data-input-temp]::after{
+  position:absolute;right:84px;bottom:6px;
+  font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 6px;border-radius:8px;
+  background:currentColor;color:var(--bg-surface,#0a0a0a);
+  opacity:0;transition:opacity .3s;
+  pointer-events:none;
+  font-family:'JetBrains Mono',monospace;
+}
+.iwrap[data-input-temp="cold"]::after{content:'ngắn';opacity:.7}
+.iwrap[data-input-temp="cool"]::after{content:'vừa';opacity:.7}
+.iwrap[data-input-temp="warm"]::after{content:'dài';opacity:.85}
+.iwrap[data-input-temp="hot"]::after{content:'cực dài — nên chia nhỏ';opacity:.95}
+
+/* Dấu gạch ngang accents cho theme light */
+[data-theme="light"] body.calm-mode .ambient-bg{
+  background-image:
+    radial-gradient(ellipse 70% 55% at 10% 5%,  rgba(94,234,212,.18) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 50% at 90% 95%, rgba(251,191,36,.12) 0%, transparent 65%) !important;
+}
